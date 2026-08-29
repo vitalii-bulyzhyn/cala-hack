@@ -15,6 +15,17 @@
   place-items: center;
 }
 
+.preferenceShell {
+  height: 100dvh;
+  min-height: 100svh;
+  overflow: hidden;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom))
+    max(0.75rem, env(safe-area-inset-left));
+}
+
 .preferencePanel,
 .generationPanel,
 .resultJournal {
@@ -28,13 +39,24 @@
 }
 
 .preferencePanel {
-  min-height: min(760px, calc(100vh - 2rem));
-  padding: clamp(1.4rem, 4vw, 4rem);
+  display: grid;
+  width: min(100%, 1260px);
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .preferenceHeader {
-  max-width: 720px;
-  margin-bottom: clamp(1.5rem, 4vw, 3rem);
+  display: grid;
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.75fr);
+  align-items: end;
+  gap: clamp(1rem, 3vw, 3rem);
+  padding: clamp(0.4rem, 1.5vh, 1rem) clamp(0.5rem, 2vw, 1.5rem);
 }
 
 .eyebrow,
@@ -63,6 +85,13 @@
   line-height: 0.95;
 }
 
+.preferenceHeader h1 {
+  max-width: none;
+  margin-bottom: 0;
+  font-size: clamp(2rem, 4.7vw, 4.35rem);
+  line-height: 0.9;
+}
+
 .preferenceHeader > p:last-child,
 .resultHeader > p:last-child {
   max-width: 58ch;
@@ -72,40 +101,90 @@
   line-height: 1.6;
 }
 
+.preferenceHeader > p:last-child {
+  margin-bottom: 0.15rem;
+  font-size: clamp(0.82rem, 1.2vw, 1rem);
+  line-height: 1.45;
+}
+
 .activityGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1rem, 3vw, 2rem);
+  min-height: 0;
+  gap: 0;
+  padding: clamp(0.35rem, 1vh, 0.75rem) 0 0;
+  filter: drop-shadow(0 24px 34px rgba(64, 48, 28, 0.22));
 }
 
 .singleGrid {
-  grid-template-columns: minmax(0, 620px);
+  grid-template-columns: minmax(0, 630px);
   justify-content: center;
 }
 
 .activityCard {
+  position: relative;
   display: grid;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1.12fr) minmax(0, 0.88fr);
   overflow: hidden;
   border: 1px solid rgba(70, 58, 39, 0.2);
-  border-radius: 6px 14px 8px 12px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 3px 6px 0 rgba(70, 58, 39, 0.07);
+  background: var(--paper);
+}
+
+.leftPage,
+.rightPage {
+  background-color: var(--paper);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.leftPage {
+  border-radius: 34px 3px 3px 34px;
+  background-image: url("/journal-left-page-background.jpg");
+}
+
+.rightPage {
+  border-radius: 3px 34px 34px 3px;
+  background-image: url("/journal-page-background.jpg");
+  box-shadow: inset 14px 0 18px rgba(71, 54, 33, 0.08);
+}
+
+.leftPage .activityCopy,
+.rightPage .activityCopy {
+  background: transparent;
 }
 
 .activityImage {
-  width: 100%;
-  aspect-ratio: 16 / 9;
+  width: calc(100% - clamp(2rem, 5vw, 4.5rem));
+  height: calc(100% - clamp(1.6rem, 4vw, 3.5rem));
+  min-height: 0;
+  align-self: end;
+  justify-self: center;
   object-fit: cover;
+  border: clamp(0.38rem, 0.7vw, 0.65rem) solid rgba(255, 253, 247, 0.96);
+  border-radius: 4px;
   background: var(--paper-deep);
+  box-shadow: 3px 6px 12px rgba(61, 45, 28, 0.16);
+}
+
+.leftPage .activityImage {
+  transform: rotate(-0.7deg);
+}
+
+.rightPage .activityImage {
+  transform: rotate(0.7deg);
 }
 
 .activityCopy {
   display: flex;
-  min-height: 280px;
+  min-height: 0;
   flex-direction: column;
   align-items: flex-start;
-  padding: clamp(1.1rem, 3vw, 1.7rem);
+  padding: clamp(0.75rem, 2vh, 1.35rem) clamp(1.4rem, 4vw, 3.5rem)
+    clamp(1.1rem, 2.7vh, 2.2rem);
 }
 
 .activityCopy h2,
@@ -115,13 +194,23 @@
   color: var(--ink);
 }
 
-.activityCopy > p:not(.category) {
-  flex: 1;
-  margin-bottom: 1.4rem;
-  line-height: 1.55;
+.activityCopy h2 {
+  max-width: 15ch;
+  margin-bottom: clamp(0.25rem, 0.8vh, 0.65rem);
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(1.55rem, 3vw, 2.65rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
 }
 
-.activityCopy button,
+.activityCopy > p:not(.category) {
+  flex: 1;
+  margin-bottom: clamp(0.5rem, 1.4vh, 1rem);
+  font-size: clamp(0.78rem, 1.15vw, 0.98rem);
+  line-height: 1.42;
+}
+
 .flowError button,
 .generationFailure a,
 .resultFooter > a {
@@ -137,37 +226,275 @@
   cursor: pointer;
 }
 
-.activityCopy button:hover,
 .flowError button:hover,
 .generationFailure a:hover,
 .resultFooter > a:hover {
   background: var(--accent-dark);
 }
 
-.activityCopy button:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
-.singleActions {
+.preferenceVoteGroup {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
-.activityCopy .secondaryButton {
+.preferenceVoteButton {
+  display: grid;
+  width: clamp(32px, 12cqw, 48px);
+  height: clamp(32px, 12cqw, 48px);
+  padding: 0;
+  border: 1px solid rgba(70, 58, 39, 0.3);
+  border-radius: 50%;
+  place-items: center;
   color: var(--accent-dark);
-  background: transparent;
-  box-shadow: none;
+  background: rgba(255, 253, 247, 0.7);
+  box-shadow: 0 3px 0 rgba(70, 58, 39, 0.18);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
-.activityCopy .secondaryButton:hover {
+.preferenceVoteButton:hover {
   color: var(--paper);
+  background: var(--accent-dark);
+}
+
+.preferenceVoteButton:active,
+.preferenceVoteButton[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--accent-dark);
+  box-shadow: 0 1px 0 rgba(70, 58, 39, 0.18);
+  transform: translateY(2px);
+}
+
+.preferenceVoteButton:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.preferenceVoteButton:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.preferencePageNumber {
+  position: absolute;
+  right: clamp(1.25rem, 3vw, 2.5rem);
+  bottom: clamp(1.25rem, 2.5vh, 2rem);
+  color: rgba(70, 58, 39, 0.48);
+  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-size: clamp(1rem, 1.6vw, 1.35rem);
+}
+
+.leftPage .preferencePageNumber {
+  right: auto;
+  left: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.preferenceJournalFace {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  isolation: isolate;
+}
+
+.preferencePhoto {
+  position: absolute;
+  top: 9cqw;
+  left: 10cqw;
+  width: 80cqw;
+  height: 48%;
+  margin: 0;
+  padding: 2.2cqw;
+  overflow: hidden;
+  border-radius: 1.5cqw;
+  background: rgba(255, 253, 247, 0.96);
+  box-shadow: 1.2cqw 1.8cqw 3cqw rgba(61, 45, 28, 0.15);
+  transform: rotate(-0.6deg);
+}
+
+.preferencePhoto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preferenceFaceCopy {
+  position: absolute;
+  top: 59%;
+  right: 12cqw;
+  left: 13cqw;
+}
+
+.preferenceFaceCopy .category {
+  margin-bottom: 2.2cqw;
+  font-size: clamp(0.42rem, 2.5cqw, 0.68rem);
+}
+
+.preferenceFaceCopy h2 {
+  max-width: 13ch;
+  margin: 0 0 2.2cqw;
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(1rem, 7.5cqw, 2.1rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 0.94;
+}
+
+.preferenceFaceCopy > p:last-child {
+  display: -webkit-box;
+  max-width: 31ch;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-ink);
+  font-size: clamp(0.52rem, 3.15cqw, 0.88rem);
+  line-height: 1.38;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.preferenceFacePageNumber {
+  position: absolute;
+  right: 8cqw;
+  bottom: 5.8cqw;
+  color: rgba(70, 58, 39, 0.55);
+  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-size: clamp(0.5rem, 3.2cqw, 0.9rem);
+}
+
+.preferenceBookRatingControls {
+  position: absolute;
+  top: 83%;
+  left: 13cqw;
+  display: flex;
+  gap: clamp(0.3rem, 3cqw, 0.75rem);
+  pointer-events: auto;
+}
+
+.preferenceBookLoading {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(1.8rem, 5vw, 3.4rem);
+}
+
+.preferenceBookError {
+  position: absolute;
+  z-index: 20;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  left: max(0.75rem, env(safe-area-inset-left));
+  width: fit-content;
+  max-width: min(34rem, calc(100% - 1.5rem));
+  margin-inline: auto;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(134, 56, 45, 0.35);
+  border-radius: 999px;
+  color: var(--accent-dark);
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: 0 8px 24px rgba(64, 48, 28, 0.15);
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
 .loadingMessage {
   font-family: "Bradley Hand", "Segoe Print", cursive;
   font-size: 1.4rem;
+}
+
+@media (max-width: 760px) {
+  .preferenceShell {
+    position: static;
+    height: auto;
+    min-height: 100svh;
+    overflow-y: auto;
+  }
+
+  .preferencePanel {
+    height: auto;
+    grid-template-rows: auto auto;
+  }
+
+  .preferenceHeader {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    padding-block: 0.8rem 1rem;
+  }
+
+  .preferenceHeader h1 {
+    font-size: clamp(2.3rem, 12vw, 3.4rem);
+  }
+
+  .activityGrid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    filter: drop-shadow(0 16px 22px rgba(64, 48, 28, 0.17));
+  }
+
+  .activityCard {
+    min-height: min(720px, 132vw);
+  }
+
+  .leftPage,
+  .rightPage {
+    border-radius: 24px;
+    background-image: url("/journal-page-background.jpg");
+    box-shadow: none;
+  }
+
+  .activityImage {
+    width: calc(100% - 2.25rem);
+    height: calc(100% - 1.8rem);
+  }
+
+  .activityCopy {
+    padding-inline: 1.5rem;
+  }
+
+  .activityCopy h2 {
+    font-size: clamp(2rem, 9vw, 2.75rem);
+  }
+
+  .leftPage .preferencePageNumber {
+    right: 1.5rem;
+    left: auto;
+  }
+}
+
+@media (max-height: 650px) and (min-width: 761px) {
+  .preferenceHeader > p:last-child {
+    display: none;
+  }
+
+  .preferenceHeader h1 {
+    font-size: clamp(2rem, 5.5vh, 3rem);
+  }
+
+  .preferenceHeader {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .activityCopy h2 {
+    font-size: clamp(1.4rem, 4.5vh, 2rem);
+  }
+
+  .activityCopy > p:not(.category) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 }
 
 .flowError {
@@ -244,11 +571,44 @@
 
 .resultJournal {
   margin-inline: auto;
-  padding: clamp(1.25rem, 5vw, 5rem);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.resultSpread {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: clamp(3rem, 7vw, 6rem);
+  filter: drop-shadow(0 24px 34px rgba(64, 48, 28, 0.2));
+}
+
+.resultLeftPage,
+.resultRightPage {
+  min-height: min(720px, 72vw);
+  padding: clamp(2rem, 5vw, 5rem);
+  border: 1px solid var(--border);
+  background-color: var(--paper);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.resultLeftPage {
+  border-radius: 34px 3px 3px 34px;
+  background-image: url("/journal-left-page-background.jpg");
+}
+
+.resultRightPage {
+  border-radius: 3px 34px 34px 3px;
+  background-image: url("/journal-page-background.jpg");
+  box-shadow: inset 14px 0 18px rgba(71, 54, 33, 0.08);
 }
 
 .resultHeader {
-  margin-bottom: clamp(2rem, 5vw, 4rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .resultHeader h1 {
@@ -256,7 +616,10 @@
 }
 
 .heroFigure {
-  margin: 0 0 clamp(3rem, 7vw, 6rem);
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .heroFigure img {
@@ -274,6 +637,30 @@
   margin-top: 0.75rem;
   color: var(--muted-ink);
   font-size: 0.82rem;
+}
+
+.offlineJournalMark {
+  margin-block: auto;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  border: 1px solid rgba(70, 58, 39, 0.16);
+  background: rgba(255, 253, 247, 0.54);
+  text-align: center;
+  transform: rotate(1deg);
+}
+
+.offlineJournalMark h2 {
+  margin: 0 0 0.8rem;
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(2rem, 5vw, 3.7rem);
+  font-weight: 500;
+}
+
+.placeSection {
+  padding: clamp(1.25rem, 5vw, 5rem);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 18px 50px rgba(64, 48, 28, 0.12);
 }
 
 .placeSection > div:first-child {
@@ -349,8 +736,14 @@
 
 @media (max-width: 700px) {
   .activityGrid,
-  .placeCard {
+  .placeCard,
+  .resultSpread {
     grid-template-columns: 1fr;
+  }
+
+  .resultLeftPage,
+  .resultRightPage {
+    min-height: 560px;
   }
 
   .activityCopy {

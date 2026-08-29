@@ -100,6 +100,12 @@ export async function getNextPreferencePage(itineraryId: string) {
   return (await response.json()) as PreferencePage;
 }
 
+export function getPreferencePages(itineraryId: string) {
+  return request<PreferencePage[]>(
+    `/api/v1/itineraries/${itineraryId}/preference-pages`,
+  );
+}
+
 export function recordPreference(
   itineraryId: string,
   itemId: string,

@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,8 +10,9 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.core.dependencies import get_preference_learning_service
-from app.core.errors import PreferenceEngineUnavailableError, PreferenceLearningIncompleteError
-from app.db.models import PreferenceItem, PreferencePage, PreferenceResponse
+from app.core.errors import PreferenceEngineUnavailableError
+from app.db.models import GenerationRun, PreferenceItem, PreferencePage, PreferenceResponse
+from app.domain.itineraries import ItineraryStatus
 from app.domain.preferences import (
     Activity,
     PreferenceDecision,
@@ -23,6 +24,7 @@ from app.domain.preferences import (
 from app.main import create_app
 from app.repositories.preference_learning import (
     CompletedPreferenceLearning,
+    PreferenceLearningRepository,
     PreferenceLearningSnapshot,
 )
 from app.services.preference_learning import (
@@ -207,6 +209,64 @@ async def test_existing_unanswered_page_is_replayed_without_algorithm_call() -> 
 
 
 @pytest.mark.asyncio
+async def test_list_pages_returns_every_issued_page_without_advancing_learning() -> None:
+    itinerary_id = uuid4()
+    issued = (
+        page(
+            itinerary_id,
+            1,
+            1,
+            2,
+            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        ),
+        page(
+            itinerary_id,
+            2,
+            3,
+            4,
+            decisions=(PreferenceDecision.DISLIKE, PreferenceDecision.LIKE),
+        ),
+        page(
+            itinerary_id,
+            3,
+            5,
+            6,
+            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        ),
+        page(
+            itinerary_id,
+            4,
+            7,
+            decisions=(PreferenceDecision.LIKE,),
+        ),
+    )
+    repository = SimpleNamespace(
+        get_snapshot=AsyncMock(
+            return_value=snapshot(
+                itinerary_id,
+                issued,
+                status=PreferenceLearningStatus.COMPLETED,
+            )
+        )
+    )
+    algorithm = FakeAlgorithm()
+    service = PreferenceLearningService(
+        repository,  # type: ignore[arg-type]
+        algorithm,
+        RecordingQueue(),
+        generation_max_attempts=3,
+    )
+
+    result = await service.list_pages(itinerary_id)
+
+    assert result == issued
+    repository.get_snapshot.assert_awaited_once_with(itinerary_id)
+    algorithm.initial.assert_not_awaited()
+    algorithm.next.assert_not_awaited()
+    algorithm.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_after_answered_pages_algorithm_can_add_single_adaptive_page() -> None:
     itinerary_id = uuid4()
     answered = (
@@ -311,52 +371,74 @@ async def test_completion_updates_algorithm_creates_run_and_notifies_worker() ->
 
 
 @pytest.mark.asyncio
-async def test_completion_requires_an_answered_adaptive_page() -> None:
+async def test_completion_allows_all_issued_items_to_remain_unanswered() -> None:
     itinerary_id = uuid4()
-    answered = tuple(
-        page(
-            itinerary_id,
-            position,
-            first,
-            second,
-            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
-        )
+    run_id = uuid4()
+    issued = tuple(
+        page(itinerary_id, position, first, second)
         for position, (first, second) in enumerate(((1, 2), (3, 4), (5, 6)), start=1)
     )
     repository = SimpleNamespace(
-        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, answered))
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, issued)),
+        complete=AsyncMock(
+            return_value=CompletedPreferenceLearning(
+                itinerary_id=itinerary_id,
+                generation_run_id=run_id,
+                replayed=False,
+            )
+        ),
     )
+    queue = RecordingQueue()
     algorithm = FakeAlgorithm()
     service = PreferenceLearningService(
         repository,  # type: ignore[arg-type]
         algorithm,
-        RecordingQueue(),
+        queue,
         generation_max_attempts=3,
     )
 
-    with pytest.raises(PreferenceLearningIncompleteError):
-        await service.complete(itinerary_id)
-    algorithm.update.assert_not_awaited()
+    completed = await service.complete(itinerary_id)
+
+    assert completed.generation_run_id == run_id
+    assert queue.run_ids == [run_id]
+    algorithm.update.assert_awaited_once_with((), ())
+    repository.complete.assert_awaited_once_with(
+        itinerary_id,
+        algorithm_version="fake-v1",
+        max_attempts=3,
+    )
 
 
 @pytest.mark.asyncio
-async def test_completion_requires_six_answers() -> None:
+async def test_completion_treats_unanswered_items_as_neutral() -> None:
     itinerary_id = uuid4()
+    run_id = uuid4()
+    issued = (
+        page(
+            itinerary_id,
+            1,
+            1,
+            2,
+            decisions=(PreferenceDecision.LIKE, None),
+        ),
+        page(
+            itinerary_id,
+            2,
+            3,
+            4,
+            decisions=(None, PreferenceDecision.DISLIKE),
+        ),
+        page(itinerary_id, 3, 5, 6),
+    )
     repository = SimpleNamespace(
-        get_snapshot=AsyncMock(
-            return_value=snapshot(
-                itinerary_id,
-                (
-                    page(
-                        itinerary_id,
-                        1,
-                        1,
-                        2,
-                        decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
-                    ),
-                ),
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, issued)),
+        complete=AsyncMock(
+            return_value=CompletedPreferenceLearning(
+                itinerary_id=itinerary_id,
+                generation_run_id=run_id,
+                replayed=False,
             )
-        )
+        ),
     )
     algorithm = FakeAlgorithm()
     service = PreferenceLearningService(
@@ -366,9 +448,57 @@ async def test_completion_requires_six_answers() -> None:
         generation_max_attempts=3,
     )
 
-    with pytest.raises(PreferenceLearningIncompleteError):
-        await service.complete(itinerary_id)
-    algorithm.update.assert_not_awaited()
+    await service.complete(itinerary_id)
+
+    selected, rejected = algorithm.update.await_args.args
+    assert [entry.name for entry in selected] == ["Activity 1"]
+    assert [entry.name for entry in rejected] == ["Activity 4"]
+
+
+@pytest.mark.asyncio
+async def test_repository_completion_has_no_response_or_adaptive_page_gate() -> None:
+    itinerary_id = uuid4()
+    now = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
+    learning = SimpleNamespace(
+        status=PreferenceLearningStatus.COLLECTING,
+        algorithm_version=None,
+        completed_at=None,
+    )
+    itinerary = SimpleNamespace(
+        status=ItineraryStatus.LEARNING_PREFERENCES,
+        status_changed_at=None,
+        state_version=0,
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(side_effect=[itinerary, now]),
+        add=Mock(),
+        commit=AsyncMock(),
+        rollback=AsyncMock(),
+    )
+    repository = PreferenceLearningRepository(session)  # type: ignore[arg-type]
+    repository._locked_learning = AsyncMock(return_value=learning)  # type: ignore[method-assign]
+
+    completed = await repository.complete(
+        itinerary_id,
+        algorithm_version="fake-v1",
+        max_attempts=3,
+    )
+
+    assert completed.itinerary_id == itinerary_id
+    assert completed.replayed is False
+    assert learning.status == PreferenceLearningStatus.COMPLETED
+    assert learning.algorithm_version == "fake-v1"
+    assert learning.completed_at == now
+    assert itinerary.status == ItineraryStatus.QUEUED
+    assert itinerary.status_changed_at == now
+    assert itinerary.state_version == 1
+    run = session.add.call_args.args[0]
+    assert isinstance(run, GenerationRun)
+    assert run.id == completed.generation_run_id
+    assert run.itinerary_id == itinerary_id
+    assert run.dedupe_key == f"itinerary:{itinerary_id}:orchestration:v4"
+    session.commit.assert_awaited_once_with()
+    session.rollback.assert_not_awaited()
 
 
 @contextmanager
@@ -422,6 +552,50 @@ def test_preference_page_api_returns_layout_and_json_entries(
             for entry in returned_page.entries
         ],
     }
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_preference_pages_api_lists_all_issued_pages_in_order(
+    settings: Settings,
+    healthy_checker: ReadinessChecker,
+) -> None:
+    itinerary_id = uuid4()
+    returned_pages = [
+        page(itinerary_id, 1, 1, 2),
+        page(itinerary_id, 2, 3, 4),
+        page(itinerary_id, 3, 5, 6),
+    ]
+    returned_pages[1].entries[0].response = PreferenceResponse(
+        id=uuid4(),
+        itinerary_id=itinerary_id,
+        item_id=returned_pages[1].entries[0].id,
+        decision=PreferenceDecision.DISLIKE,
+    )
+    service = SimpleNamespace(list_pages=AsyncMock(return_value=tuple(returned_pages)))
+
+    with preference_client(settings, healthy_checker, service) as client:
+        response = client.get(f"/api/v1/itineraries/{itinerary_id}/preference-pages")
+
+    assert response.status_code == 200
+    assert [candidate["position"] for candidate in response.json()] == [1, 2, 3]
+    assert [len(candidate["entries"]) for candidate in response.json()] == [2, 2, 2]
+    assert response.json()[1]["entries"][0]["decision"] == "dislike"
+    assert response.headers["cache-control"] == "no-store"
+    service.list_pages.assert_awaited_once_with(itinerary_id)
+
+
+def test_preference_pages_api_returns_an_empty_list_before_issuance(
+    settings: Settings,
+    healthy_checker: ReadinessChecker,
+) -> None:
+    itinerary_id = uuid4()
+    service = SimpleNamespace(list_pages=AsyncMock(return_value=()))
+
+    with preference_client(settings, healthy_checker, service) as client:
+        response = client.get(f"/api/v1/itineraries/{itinerary_id}/preference-pages")
+
+    assert response.status_code == 200
+    assert response.json() == []
     assert response.headers["cache-control"] == "no-store"
 
 

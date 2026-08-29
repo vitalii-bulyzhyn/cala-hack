@@ -24,6 +24,7 @@ x-backend-environment: &backend-environment
   OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-terra}
   OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-120}
   PROVIDER_CONTEXT_MAX_CHARS: ${PROVIDER_CONTEXT_MAX_CHARS:-30000}
+  OFFLINE_DEMO_ENABLED: ${OFFLINE_DEMO_ENABLED:-true}
   CALA_API_KEY: ${CALA_API_KEY:-}
   CALA_BASE_URL: ${CALA_BASE_URL:-https://api.cala.ai}
   CALA_TIMEOUT_SECONDS: ${CALA_TIMEOUT_SECONDS:-30}
@@ -105,6 +106,13 @@ services:
       postgres:
         condition: service_healthy
 
+  media-init:
+    image: alpine:3.22
+    restart: "no"
+    command: ["sh", "-c", "chown -R 100:101 /data/generated-media"]
+    volumes:
+      - generated_media:/data/generated-media
+
   backend:
     build:
       context: ./dev/backend
@@ -119,6 +127,8 @@ services:
       - generated_media:/data/generated-media
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      media-init:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
@@ -144,6 +154,8 @@ services:
       - generated_media:/data/generated-media
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      media-init:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy

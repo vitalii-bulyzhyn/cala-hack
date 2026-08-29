@@ -16,13 +16,14 @@ The primary task is: choose a city and tags, react to visual activity options in
 
 ### 2. Preference learning
 
-- Use the itinerary ID to call `GET .../preference-pages/next`.
-- Render `layout: pair` as two activity cards and `layout: single` as one centered activity card.
+- Use the itinerary ID to call `GET .../preference-pages/next` once to issue the three initial pairs, then `GET .../preference-pages` to load every persisted page.
+- Present the six initial activities as six faces in the same flipping journal used for the result. A returned `pair` supplies the left/right faces of one opening; a returned `single` occupies one centered face.
 - Every card/opening uses the returned image link, name, category, description, and nullable saved decision. Do not infer identity from array position; send the entry UUID with the response.
 - Record each choice with `PUT .../preference-items/{item_id}/response` and `decision: like|dislike`.
-- Keep the current page until every entry has a response. A repeated GET must be safe after reload.
-- The first sequence is three pairs/six responses: choosing one card records it as liked and the alternative as disliked. One adaptive single/pair page follows; a `204` means the algorithm is finished.
-- The frontend calls completion after `204`; generation begins from its `202` response.
+- Keep like and dislike controls on every activity face, restore their pressed state from `decision`, and allow page turns whether or not the current face has a response. A vote affects only the exact entry UUID.
+- The integrated flow shows the three initial pairs as six faces and lets the traveler create the journal from the final face whether they answered all, some, or none. Unanswered activities are neutral.
+- A client that records all six initial responses may optionally request an adaptive single/pair page; a `204` means the algorithm has no further page. An adaptive page is not required for completion.
+- The frontend calls completion when the traveler finishes the preference book; generation begins from its `202` response using only recorded likes/dislikes.
 - Initial suggestions work without provider keys. Adaptive OpenAI reranking falls back deterministically when unavailable.
 
 ### 3. Generation
@@ -52,7 +53,7 @@ The image is the visual artifact, not the sole itinerary representation. Do not 
 
 ### 5. Fail result
 
-Retain the original city/tags and show the safe backend message. Use `retryable` to decide whether retry language is appropriate, and retain the request ID for support. In local development, `PROVIDER_CONFIGURATION_MISSING` should direct contributors to `.env` without revealing values.
+Retain the original city/tags and show the safe backend message. Use `retryable` to decide whether retry language is appropriate, and retain the request ID for support. `PROVIDER_CONFIGURATION_MISSING` is possible only when offline demo mode is disabled.
 
 ## Interface states
 
@@ -60,8 +61,9 @@ Retain the original city/tags and show the safe backend message. Use `retryable`
 | --- | --- |
 | Before submit | Explain the one-day promise and focus the city field. |
 | Client validation error | Identify the problem without clearing city or tags. |
-| Preference page | Render one/two entries according to layout and persist each response by item ID. |
-| No next page (`204`) | Complete learning and enter generation polling. |
+| Preference pages | Render every issued entry as a journal face, permit page turns before voting, and persist each response by item ID. |
+| End of preference book | Allow completion with zero or more responses and enter generation polling. |
+| No next page (`204`) | Complete learning if the client used optional adaptive progression. |
 | `pending` | Announce the current stage and continue polling. `result` and `error` are null. |
 | `done` | Stop polling; render the complete image and places. `stage` and `error` are null. |
 | `fail` | Stop polling; render safe failure/retry guidance. `stage` and `result` are null. |
@@ -71,6 +73,7 @@ There is no public partial state. If any required result field or the hero image
 
 ## Visual direction
 
+- Use the bundled inward-rounded paper image for every left journal page and the outward-rounded supplied paper image for every right journal page, including the active result spread.
 - Let the generated 4:3 journal image carry watercolor, ink, tactile paper, taped sketches, and playful route marks.
 - Keep surrounding controls and place details restrained, readable, and visually compatible with the artifact.
 - Use short place labels in the generated image; schedules, descriptions, and links belong in HTML.

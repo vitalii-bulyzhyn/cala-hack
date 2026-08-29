@@ -12,7 +12,6 @@ from app.core.errors import (
     PreferenceEngineUnavailableError,
     PreferenceItemNotFoundError,
     PreferenceLearningClosedError,
-    PreferenceLearningIncompleteError,
     PreferencePageIncompleteError,
 )
 from app.db.models import PreferenceItem, PreferencePage, PreferenceResponse
@@ -20,14 +19,12 @@ from app.domain.preferences import (
     Activity,
     PreferenceDecision,
     PreferenceLearningStatus,
-    PreferencePageSource,
     PreferencePageSuggestion,
 )
 from app.repositories.preference_learning import (
     CompletedPreferenceLearning,
     PreferenceItemMissingError,
     PreferenceLearningClosedRepositoryError,
-    PreferenceLearningIncompleteRepositoryError,
     PreferenceLearningRepository,
     PreferenceLearningSnapshot,
     PreferencePageIncompleteRepositoryError,
@@ -116,6 +113,10 @@ class PreferenceLearningService:
         self._queue = queue
         self._generation_max_attempts = generation_max_attempts
 
+    async def list_pages(self, itinerary_id: UUID) -> tuple[PreferencePage, ...]:
+        snapshot = await self._snapshot(itinerary_id)
+        return snapshot.pages
+
     async def get_next_page(self, itinerary_id: UUID) -> PreferencePage | None:
         snapshot = await self._snapshot(itinerary_id)
         self._ensure_collecting(snapshot)
@@ -195,12 +196,6 @@ class PreferenceLearningService:
         if snapshot.status == PreferenceLearningStatus.COMPLETED:
             return await self._repository.completed_result(itinerary_id)
         selected, rejected = _partition_activities(snapshot)
-        if (
-            len(selected) + len(rejected) < 7
-            or not _has_answered_adaptive_page(snapshot)
-            or _first_unanswered_page(snapshot) is not None
-        ):
-            raise PreferenceLearningIncompleteError
         try:
             await self._algorithm.update_learning_algorithm(selected, rejected)
             completed = await self._repository.complete(
@@ -210,8 +205,6 @@ class PreferenceLearningService:
             )
         except PreferenceAlgorithmNotConfiguredError as exc:
             raise PreferenceEngineUnavailableError from exc
-        except PreferenceLearningIncompleteRepositoryError as exc:
-            raise PreferenceLearningIncompleteError from exc
         except PreferenceLearningClosedRepositoryError as exc:
             raise PreferenceLearningClosedError from exc
         except SQLAlchemyError as exc:
@@ -270,15 +263,6 @@ def _partition_activities(
             else:
                 rejected.append(activity)
     return tuple(selected), tuple(rejected)
-
-
-def _has_answered_adaptive_page(snapshot: PreferenceLearningSnapshot) -> bool:
-    return any(
-        page.source == PreferencePageSource.ADAPTIVE
-        and page.entries
-        and all(entry.response is not None for entry in page.entries)
-        for page in snapshot.pages
-    )
 
 
 def _activity(entry: PreferenceItem) -> Activity:

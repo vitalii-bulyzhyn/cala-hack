@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 
 import styles from "@/app/journal-demo/journal-demo.module.css";
 
-const PAGE_BACKGROUND = "/journal-demo/static-page.svg";
+const LEFT_PAGE_BACKGROUND = "/journal-left-page-background.jpg";
+const RIGHT_PAGE_BACKGROUND = "/journal-page-background.jpg";
 const PAGE_ASPECT_RATIO = 7 / 5;
 const MIN_PAGE_WIDTH = 80;
 const BOOK_SIDE_CLEARANCE = 32;
@@ -62,11 +63,12 @@ function JournalFace({
   heading,
   pageNumber,
 }: JournalFaceProps) {
+  const background = pageNumber % 2 === 1 ? RIGHT_PAGE_BACKGROUND : LEFT_PAGE_BACKGROUND;
   return (
     <article
       aria-label={`Journal page ${pageNumber} for ${destination}`}
       className={styles.journalFace}
-      style={{ backgroundImage: `url(${PAGE_BACKGROUND})` }}
+      style={{ backgroundImage: `url(${background})` }}
     >
       <div className={styles.faceContent}>
         <p className={styles.faceKicker}>{destination} · field notes</p>

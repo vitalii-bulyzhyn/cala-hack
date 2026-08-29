@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -133,6 +134,14 @@ for _ in range(240):
     time.sleep(1)
 
 assert resource["status"] in {"done", "fail"}, resource
+offline_demo_expected = os.getenv("OFFLINE_DEMO_ENABLED", "true").lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+} and any(not os.getenv(key, "").strip() for key in ("OPENAI_API_KEY", "CALA_API_KEY", "FAL_KEY"))
+if offline_demo_expected:
+    assert resource["status"] == "done", resource
 if resource["status"] == "done":
     result = resource["result"]
     assert "/media/" in result["journal_image"]["url"], result

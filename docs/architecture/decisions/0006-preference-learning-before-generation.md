@@ -22,7 +22,7 @@ Generation previously started in the create transaction, so it could finish befo
 - Later pages contain one or two activities and expose `layout: single|pair`.
 - Every activity is durably stored with its UUID, name, category, description, and HTTP(S) image link before it is returned.
 - Responses are per-itinerary, per-item `like|dislike` upserts. Learning is immutable after completion.
-- Completion requires the six initial responses, an answered adaptive page, and all issued entries answered. It invokes the algorithm update hook, closes the session, creates exactly one version-4 orchestration run, and best-effort notifies Redis after commit.
+- Completion is an explicit traveler action and is allowed while any number of issued entries remain unanswered; an adaptive page is optional. Recorded likes/dislikes are passed to the update hook and worker as selected/rejected snapshots, while unanswered entries are neutral and omitted. Completion closes the session, creates exactly one version-4 orchestration run, and best-effort notifies Redis after commit.
 - The worker receives selected and rejected activity snapshots alongside original city/tags. Provider planning treats them as untrusted preference data.
 - Postgres remains authoritative. Redis still carries only the resulting generation-run UUID.
 
@@ -30,6 +30,7 @@ Generation previously started in the create transaction, so it could finish befo
 
 - Final generation cannot race ahead of learning.
 - Reloaded clients can retrieve the same unanswered page and safely repeat a decision.
+- Travelers can skip any or every activity without being blocked from generation; sparse learning falls back to the original city/tags and generation defaults.
 - Future recommendation implementations have a narrow replaceable interface without changing public API or persistence.
 - Preference learning works offline from curated data; optional adaptive OpenAI use adds latency/cost only when configured.
 - `GET .../preference-pages/next` has get-or-create behavior when a new algorithm page is needed. It is repeat-safe and non-cacheable, but it is not a strictly side-effect-free HTTP read.

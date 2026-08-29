@@ -1,6 +1,6 @@
 # External integrations
 
-Status: Cala query/search, OpenAI Responses structured intent/plan, fal queue generation, fenced checkpoints, and app-owned media copy are **Current**.
+Status: Provider-free demo generation, Cala query/search, OpenAI Responses structured intent/plan, fal queue generation, fenced checkpoints, and app-owned media copy are **Current**.
 
 All integrations are backend-only and return application-owned types. Provider SDK objects and raw payloads do not cross into route schemas, persisted public result fields, or frontend code.
 
@@ -14,8 +14,13 @@ All integrations are backend-only and return application-owned types. Provider S
 | OpenAI plan | Select/sequence three to five Cala-grounded places and produce typed copy/location/link candidates | A source of invented URLs, coordinates, or live facts |
 | fal | Generate exactly one illustrative 4:3 hero through its async queue | Permanent storage or a factual depiction guarantee |
 | App media store | Copy validated provider bytes atomically and expose `/media/...` | Production object storage/CDN |
+| Offline demo pipeline | Produce labeled illustrative stops and copy the bundled paper hero without network calls | Grounded venue research or live travel advice |
 
-See [ADR 0002](decisions/0002-backend-owned-provider-access.md) for provider ownership, [ADR 0004](decisions/0004-natural-request-and-journal-artifact.md) for the artifact contract, [ADR 0005](decisions/0005-city-and-tags-input.md) for input ownership, and [ADR 0006](decisions/0006-preference-learning-before-generation.md) for learned-choice ownership.
+See [ADR 0002](decisions/0002-backend-owned-provider-access.md) for provider ownership, [ADR 0004](decisions/0004-natural-request-and-journal-artifact.md) for the artifact contract, [ADR 0005](decisions/0005-city-and-tags-input.md) for input ownership, [ADR 0006](decisions/0006-preference-learning-before-generation.md) for learned-choice ownership, and [ADR 0007](decisions/0007-provider-free-demo-generation.md) for credential-free completion.
+
+## Provider-free demo generation
+
+When any OpenAI, Cala, or fal credential is absent and `OFFLINE_DEMO_ENABLED=true`, the worker contacts no provider. It creates three or four illustrative entries from the liked activity snapshot, adds application-built map searches, uses `UTC`, copies the bundled paper JPEG atomically into itinerary-scoped media, and completes through the normal fenced repository path. Its summary and image caption identify it as an offline sample. With all credentials present, the real provider pipeline is selected instead.
 
 ## Preference activity ranking
 
@@ -114,7 +119,8 @@ Malformed URLs, unsafe redirects/addresses, invalid content, and filesystem fail
 ## Error and configuration contract
 
 - All three keys are optional at process startup and readiness.
-- When any key is absent, the worker uses an unconfigured pipeline and terminally records `PROVIDER_CONFIGURATION_MISSING` without contacting a provider.
+- When any key is absent, the worker uses the provider-free demo pipeline by default and reaches a labeled `done` result without contacting a provider.
+- With `OFFLINE_DEMO_ENABLED=false`, incomplete provider configuration terminally records `PROVIDER_CONFIGURATION_MISSING`.
 - Provider configuration status reports presence only and reveals no secret fragment.
 - Provider connection/timeouts, rate limits, invalid/refused/incomplete output, safety rejection, and media-copy failures become stable safe codes with retry classification.
 - Retryable failures use the durable run attempt limit/backoff. A required failure after exhaustion produces public `fail`; no public partial result exists.

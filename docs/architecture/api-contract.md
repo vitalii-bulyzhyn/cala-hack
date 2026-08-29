@@ -73,13 +73,23 @@ The new resource has internal stage `learning_preferences`. The frontend uses th
 
 Preference learning is scoped to one itinerary. Its injected algorithm interface is implemented by `catalog-bandit-v1`: deterministic city/tag ranking over a curated catalog for the initial six, followed by an optional OpenAI rerank with deterministic fallback for an adaptive page. The unconfigured implementation remains available for explicit injection/tests and returns `503 PREFERENCE_ENGINE_NOT_CONFIGURED`.
 
+### List issued pages
+
+```http
+GET /api/v1/itineraries/{itinerary_id}/preference-pages
+```
+
+Returns a JSON array of every persisted preference page in ascending `position`, using the same page and entry shape documented below. Each entry includes its current nullable `decision`, so the client can restore votes while letting the traveler flip among all issued faces. The response is `[]` before any page has been issued and uses `Cache-Control: no-store`.
+
+This endpoint is strictly read-only: it does not call the preference algorithm, create an initial or adaptive page, require a response on the current page, or change learning/completion state. The client first calls `GET .../preference-pages/next` to issue the three initial pairs, then can use this collection endpoint to render and navigate all six initial activity faces without voting first. If all issued entries are answered, `GET .../next` remains the only operation that can optionally issue an adaptive page or return `204`; clients may instead complete learning directly.
+
 ### Get the next page
 
 ```http
 GET /api/v1/itineraries/{itinerary_id}/preference-pages/next
 ```
 
-The first call asks the algorithm for exactly three initial pairs, persists all six activities as three pages, and returns page one. Repeated calls return the earliest page with unanswered entries. After every issued entry has a response, the algorithm may return an adaptive page containing either one activity or a pair. `204 No Content` means it has no next page. Responses use `Cache-Control: no-store`.
+The first call asks the algorithm for exactly three initial pairs, persists all six activities as three pages, and returns page one. Repeated calls return the earliest page with unanswered entries; use the read-only collection endpoint above when the UI needs to browse the other already-issued pages before responding. After every issued entry has a response, the algorithm may return an adaptive page containing either one activity or a pair. `204 No Content` means it has no next page. Responses use `Cache-Control: no-store`.
 
 ```json
 {
@@ -138,7 +148,7 @@ Content-Type: application/json
 POST /api/v1/itineraries/{itinerary_id}/preference-learning/complete
 ```
 
-Completion requires the six initial responses, at least one fully answered adaptive page, and no unanswered entry on an issued page. The API calls the algorithm's update hook, atomically closes learning, transitions the itinerary to `queued`, creates one version-4 orchestration run, and then best-effort notifies Redis. Replays return the same resource and do not create a second run.
+Completion is allowed at any time while the learning session is collecting, including when some or every issued entry is unanswered and when no adaptive page exists. Recorded `like` responses are passed as selected activities, recorded `dislike` responses as rejected activities, and unanswered entries are neutral and omitted from both snapshots. The API calls the algorithm's update hook with those recorded snapshots, atomically closes learning, transitions the itinerary to `queued`, creates one version-4 orchestration run, and then best-effort notifies Redis. Replays return the same resource and do not create a second run; after completion, responses and page issuance remain closed.
 
 The `202` body matches itinerary creation: `id`, `status: "pending"`, and `status_url`. It includes `Retry-After` for worker polling. The worker receives original city/tags plus the full selected/rejected activity snapshots. Only after this endpoint should the frontend poll for generated output.
 
@@ -257,6 +267,8 @@ The worker uses the resource's immutable UTC creation date on every attempt:
 
 ### Fail response
 
+For example, incomplete provider configuration produces this response when `OFFLINE_DEMO_ENABLED=false`:
+
 ```json
 {
   "id": "52cf6f93-9fbc-4f97-a815-74b8fedcb8b1",
@@ -299,7 +311,6 @@ Request/persistence failures use:
 | `404` | `ITINERARY_NOT_FOUND` | UUID does not identify a resource. |
 | `404` | `PREFERENCE_ITEM_NOT_FOUND` | Item does not belong to the itinerary. |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | Key belongs to different city/tag input. |
-| `409` | `PREFERENCE_LEARNING_INCOMPLETE` | Initial/adaptive responses are missing or an issued page is incomplete. |
 | `409` | `PREFERENCE_LEARNING_CLOSED` | Learning has already completed. |
 | `503` | `PREFERENCE_ENGINE_NOT_CONFIGURED` | An explicitly injected algorithm implementation is unavailable. |
 | `502` | `PREFERENCE_ENGINE_INVALID_OUTPUT` | Algorithm output violated the activity/page contract. |

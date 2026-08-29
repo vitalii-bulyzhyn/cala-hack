@@ -1,6 +1,6 @@
 # 0004: Natural request and complete journal artifact
 
-- Status: Accepted; input/date portion superseded by [ADR 0005](0005-city-and-tags-input.md)
+- Status: Accepted; input/date portion superseded by [ADR 0005](0005-city-and-tags-input.md), missing-configuration portion superseded by [ADR 0007](0007-provider-free-demo-generation.md)
 - Date: 2026-08-29
 
 ## Context
@@ -54,7 +54,7 @@ The application plan and fal request ID are durable fenced checkpoints as define
 
 ### Missing configuration
 
-OpenAI, Cala, and fal keys are optional for process boot/readiness. A submitted job without all required keys terminates as `fail` with `PROVIDER_CONFIGURATION_MISSING` and calls no provider.
+This original behavior is superseded by ADR 0007. Missing keys now select the labeled offline demo pipeline by default; operators can disable that fallback to restore `PROVIDER_CONFIGURATION_MISSING`.
 
 ## Consequences
 

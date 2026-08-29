@@ -135,7 +135,7 @@ There is no public partial state.
 - Tags are case-insensitively deduplicated for storage, while idempotency additionally treats tag order as irrelevant.
 - Creation commits the itinerary and learning session atomically, with no generation run.
 - Initial suggestions are exactly three pairs; later suggestions contain one item or one pair.
-- Completion requires the six initial responses, an answered adaptive page, and every issued item answered.
+- Completion may close a collecting session with zero, partial, or complete responses and without an adaptive page; unanswered items are neutral and omitted from selected/rejected snapshots.
 - Completion atomically closes learning, changes `learning_preferences -> queued`, and creates exactly one version-4 run.
 - Planned date is the immutable UTC reference date plus seven days.
 - Destination timezone is a valid IANA name.

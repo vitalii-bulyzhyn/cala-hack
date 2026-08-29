@@ -30,7 +30,7 @@ Composed smoke creates an itinerary, answers the three initial catalog pairs, co
 - City/tag NFKC/whitespace cleaning, length/control/letter constraints, tag deduplication, and extra-field rejection.
 - Optional idempotency hashing, semantic city/tag fingerprint, replay current status/header, conflict, and no duplicate learning session.
 - Three initial pairs/six activity contracts, four-category catalog coverage, deterministic ranking, optional OpenAI rerank/fallback, single/pair adaptive layouts, activity validation, and unanswered-page replay.
-- Itinerary/item-scoped like/dislike upserts, initial-plus-adaptive completion gate, algorithm update hook, single version-4 run creation, and worker notification.
+- Itinerary/item-scoped like/dislike upserts, zero/partial/full-response completion, neutral unanswered items, algorithm update hook, single version-4 run creation, and worker notification.
 - Worker preference snapshots partition selected/rejected activities in stable page/item order.
 - Public projection matrix for all internal statuses, including nullable stage/result/error invariants and incomplete-ready fallback.
 - Fixed creation-date-plus-seven-days behavior across retries and valid IANA timezone resolution.

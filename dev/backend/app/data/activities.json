@@ -52,7 +52,7 @@
     "name": "Craft cocktail hideaways",
     "category": "drinks_party",
     "description": "Discover two distinctive cocktail spots tucked into the streets of {city}.",
-    "image_link": "https://images.unsplash.com/photo-1470337458703-46ad1756a1875?auto=format&fit=crop&w=1200&q=80",
+    "image_link": "https://images.unsplash.com/photo-1579485187186-2d504e89761a?auto=format&fit=crop&w=1200&q=80",
     "signals": ["cocktails", "bars", "nightlife", "design"]
   },
   {

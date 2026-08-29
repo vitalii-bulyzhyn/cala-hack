@@ -15,9 +15,9 @@ Status: Commands, four migrations, catalog-backed preference endpoints, worker p
 make dev
 ```
 
-This creates `.env` when missing, builds images, runs the one-shot `migrate`, and starts frontend, backend, worker, Postgres, Redis, and pgAdmin. API and worker share the `generated_media` volume.
+This creates `.env` when missing, builds images, runs the one-shot `migrate` and local media-permission initialization, and starts frontend, backend, worker, Postgres, Redis, and pgAdmin. API and worker share the `generated_media` volume.
 
-The stack starts with a bundled activity catalog and optional empty provider keys. Initial/adaptive preference pages work deterministically without keys; OpenAI may rerank adaptive choices when configured. After learning completes, missing generation keys produce `PROVIDER_CONFIGURATION_MISSING`.
+The stack starts with a bundled activity catalog, paper journal asset, and optional empty provider keys. Initial/adaptive preference pages and a complete labeled demo journal work deterministically without keys or external calls. OpenAI may rerank adaptive choices when configured; the real Cala/OpenAI/fal generation path is selected only when all three keys exist.
 
 Use `make setup` only for host-local application processes.
 
@@ -88,7 +88,7 @@ The target:
 6. Reads the resource back in `learning_preferences` with the stored city/tags.
 7. Retrieves/answers three initial pair pages and one adaptive single/pair page, verifies `204`, completes learning, and polls the created worker run to `done|fail`.
 
-With empty keys smoke is non-billable and expects terminal `PROVIDER_CONFIGURATION_MISSING`. With real keys it can invoke OpenAI/Cala/fal, consume quota, and incur cost.
+With empty keys smoke is non-billable and requires a complete offline demo result. With all real keys it can invoke OpenAI/Cala/fal, consume quota, and incur cost.
 
 ## Manual lifecycle
 
@@ -112,7 +112,7 @@ The second call returns the first pair. Record every entry with `PUT .../prefere
 
 - Postgres is required for readiness, accepted resources, claims, checkpoints, and results.
 - Redis is optional in API readiness. Enqueue failure does not fail POST; reconciliation finds durable work independently.
-- Provider availability/configuration is not readiness. Missing keys fail jobs, not process boot.
+- Provider availability/configuration is not readiness. Missing keys use offline demo generation by default.
 - API and worker never create schema; Compose gates both on migration.
 - fal source URLs are temporary inputs only. Success occurs after copying bytes into app storage.
 - Normal down/up retains named database/Redis/pgAdmin/media volumes. `make reset` deletes them.
@@ -138,7 +138,7 @@ If stage is `learning_preferences`, finish the preference flow; no worker run ex
 
 ### Resource fails with `PROVIDER_CONFIGURATION_MISSING`
 
-Set all three provider keys in `.env`, restart API/worker, and create a new resource. Provider status reveals presence only. An existing terminal failure is not automatically re-opened.
+This occurs only when `OFFLINE_DEMO_ENABLED=false`. Set all three provider keys in `.env` or re-enable offline demo mode, restart API/worker, and create a new resource. Provider status reveals presence only. An existing terminal failure is not automatically re-opened.
 
 ### Provider-stage failure
 

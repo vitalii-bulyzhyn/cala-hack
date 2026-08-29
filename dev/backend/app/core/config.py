@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.6-terra"
     openai_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     provider_context_max_chars: int = Field(default=30_000, ge=1_000, le=100_000)
+    offline_demo_enabled: bool = True
 
     cala_api_key: SecretStr | None = None
     cala_base_url: str = "https://api.cala.ai"

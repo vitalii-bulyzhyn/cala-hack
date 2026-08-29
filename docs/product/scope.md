@@ -1,6 +1,6 @@
 # Product scope
 
-Status: City/tag persistence, preference-learning persistence/APIs, provider generation, polling, linked places, and app-owned local media are **Current**. The preference algorithm, polished frontend, and production operations are not complete.
+Status: City/tag persistence, preference-learning persistence/APIs, provider-free and provider-backed generation, polling, linked places, app-owned local media, and the integrated frontend are **Current**. Production operations remain open.
 
 ## Confirmed scope
 
@@ -9,7 +9,7 @@ Status: City/tag persistence, preference-learning persistence/APIs, provider gen
 - Output: one future/current one-day itinerary with three to five ordered places.
 - Presentation: one landscape 4:3, hand-drawn journal image plus structured place data and links.
 - Platform: web application using Next.js and FastAPI.
-- Services: Postgres, Redis, Cala, OpenAI, and fal.
+- Services: Postgres and Redis locally; Cala, OpenAI, and fal are optional for the grounded/generated path.
 
 ## Current backend behavior
 
@@ -17,11 +17,12 @@ Status: City/tag persistence, preference-learning persistence/APIs, provider gen
 - Preference APIs get-or-create the next page, upsert item responses, and complete learning. Completion creates the one generation run.
 - `catalog-bandit-v1` selects six unique initial activities across food, drinks/party, culture, and nature, then may issue one adaptive single/pair page. OpenAI reranking is optional and falls back locally.
 - `GET /api/v1/itineraries/{id}` exposes only `pending`, `done`, or `fail`; `stage` is non-null only while pending, `result` only when done, and `error` only when failed.
-- OpenAI resolves the canonical destination and IANA timezone. Stored tags plus selected/rejected activity snapshots guide planning; the date is seven days after immutable creation.
+- Without provider credentials, a labeled deterministic demo uses the stored city, selected activities, UTC, map searches, and the same seven-day date so the full product remains testable.
+- With all credentials, OpenAI resolves the canonical destination and IANA timezone. Stored tags plus selected/rejected activity snapshots guide planning; the date is seven days after immutable creation.
 - Cala knowledge query and search provide place candidates and evidence. A second OpenAI Responses structured output creates three to five non-overlapping places.
 - The worker checkpoints the application plan and fal request ID behind its lease/fence, generates exactly one hero, copies it into app-owned storage, and completes atomically.
 - Every place has a generated map-search link. `official` and `source` links must match URLs present in Cala research.
-- Missing provider credentials allow the stack to boot, but the job fails with `PROVIDER_CONFIGURATION_MISSING`.
+- Missing provider credentials select a labeled offline demo by default, keeping the complete input/preferences/journal flow testable without network provider calls.
 - Any required provider, plan, image, or media-storage failure produces `fail`; no public partial result exists.
 
 The exact [API contract](../architecture/api-contract.md) and [domain model](../architecture/domain-model.md) are canonical.
@@ -36,7 +37,7 @@ The exact [API contract](../architecture/api-contract.md) and [domain model](../
 
 1. A user can submit a valid city and tag array and poll the returned resource.
 2. A configured preference engine can return six initial entries, each with image link/name/category/description, and store like/dislike by itinerary/item.
-3. Single/pair layouts are explicit, and completion cannot create generation work before the six initial responses plus an answered adaptive page.
+3. Single/pair layouts are explicit, page turns do not require a response, and explicit completion can create generation work with zero, partial, or complete recorded preferences.
 4. Pending UI copy reflects `learning_preferences`, `queued`, `researching`, `planning`, or `illustrating` without exposing providers.
 5. A `done` result contains all required destination metadata, three to five consecutive/non-overlapping places, and one ready hero image.
 6. Place links are typed as `map`, `official`, or `source`; every place has a map link and verified links are traceable to Cala research.

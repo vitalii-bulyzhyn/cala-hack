@@ -25,7 +25,7 @@ Example input:
 2. The API persists a durable resource in `learning_preferences` and returns its ID.
 3. The frontend requests the next preference page. The first algorithm call supplies three pairs (six activities); later pages may show one activity across a spread or a pair, one per page.
 4. Every issued activity is stored with image link, name, category, and description. Each like/dislike response is stored against the itinerary and exact item.
-5. After the six initial answers and one answered adaptive page, completion updates the learning algorithm and only then creates the worker run.
+5. From the final preference face, the user can complete with zero, partial, or complete responses. Completion updates the learning algorithm with recorded votes only and then creates the worker run; an adaptive page remains optional for clients that request one.
 6. The worker uses city, tags, selected activities, and rejected activities while researching/planning, then checkpoints and illustrates the journal as before.
 7. The user receives either `done` with one journal image and linked places, or `fail` with a safe error.
 
@@ -47,11 +47,11 @@ The planned day is seven days after the immutable UTC date on which the resource
 
 ### Learn before generating
 
-Generation never starts at initial submission. Stable issued-item IDs make reload/retry show the same choice, and completion requires the initial six responses plus an answered adaptive page. The default algorithm covers food, drinks/party, culture, and nature from an extendable catalog; it ranks locally and can use OpenAI only to rerank unseen adaptive choices.
+Generation never starts at initial submission. Stable issued-item IDs make reload/retry show the same choice, while explicit completion may proceed with no votes: recorded likes/dislikes shape generation and unanswered entries remain neutral. The default algorithm covers food, drinks/party, culture, and nature from an extendable catalog; it ranks locally and can use OpenAI only to rerank unseen adaptive choices.
 
 ### Honest terminal outcomes
 
-The plan and the hero image are both core. A missing provider, invalid plan, unsafe/failed image, exhausted retry, or media-copy failure produces `fail`; the API never labels incomplete output `done`.
+The plan and the hero image are both core. Missing providers select the labeled offline demo by default. In the live pipeline, an invalid plan, unsafe/failed image, exhausted retry, or media-copy failure produces `fail`; the API never labels incomplete output `done`.
 
 ### Durable progress without provider leakage
 

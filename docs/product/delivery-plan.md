@@ -29,7 +29,7 @@ Status: **Complete**.
 - Creation stores a collecting learning session and does not start generation.
 - Persist three initial pair pages/six items from the algorithm, followed by optional single/pair adaptive pages.
 - Upsert `like|dislike` decisions against exact itinerary/item IDs.
-- Require the six initial responses plus an answered adaptive page before creating the one generation run.
+- Allow explicit completion with zero, partial, or complete responses; pass only recorded likes/dislikes into the one generation run and treat unanswered items as neutral.
 - Pass selected/rejected activity snapshots to worker planning.
 - Rank an extendable four-category catalog deterministically; optionally use OpenAI for adaptive reranking with local fallback.
 

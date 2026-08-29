@@ -22,9 +22,10 @@ Run `make worker-dev` separately. Configuration comes from the process environme
 - `GET /api/v1/providers/status` — redacted configuration presence; no provider call.
 - `POST /api/v1/itineraries` — accepts `{"city":"Barcelona","tags":["art","local food"]}` and returns `202` plus the resource's current public status.
 - `GET /api/v1/itineraries/{itinerary_id}` — returns `pending`, `done`, or `fail`, a stable pending stage or `null`, and mutually exclusive result/error data.
+- `GET /api/v1/itineraries/{itinerary_id}/preference-pages` — lists every issued page and its current decisions without advancing learning.
 - `GET /api/v1/itineraries/{itinerary_id}/preference-pages/next` — returns/replays the current single/pair page, creates the next algorithm page when required, or returns `204`.
 - `PUT /api/v1/itineraries/{itinerary_id}/preference-items/{item_id}/response` — upserts `{"decision":"like|dislike"}` for the exact issued item.
-- `POST /api/v1/itineraries/{itinerary_id}/preference-learning/complete` — requires the six initial responses plus an answered adaptive page and creates/enqueues generation.
+- `POST /api/v1/itineraries/{itinerary_id}/preference-learning/complete` — closes learning with zero or more recorded responses and creates/enqueues generation.
 - `GET /api/v1/openapi.json` — OpenAPI schema.
 - `GET /docs` — Swagger UI.
 - `GET /media/{storage_key}` — app-owned generated image bytes.
@@ -37,7 +38,7 @@ An optional `Idempotency-Key` accepts 1–128 letters, digits, `.`, `_`, `:`, or
 
 Creation atomically stores the itinerary and a collecting learning session in stage `learning_preferences`; it deliberately creates no generation run. `PreferenceLearningAlgorithm` defines `get_initial_pairs`, `get_next_page`, and `update_learning_algorithm`. The default `catalog-bandit-v1` implementation ranks a curated four-category catalog deterministically and may use OpenAI for adaptive reranking when configured; its fallback requires no key.
 
-The implemented persistence contract requires three initial pairs (six entries), allows later single/pair pages, and stores every entry's UUID, name, category, description, and HTTP(S) image link. Responses are itinerary/item-scoped upserts and become immutable at completion. Completion creates deduplicated orchestration version 4 and passes selected/rejected activity snapshots to the worker.
+The implemented persistence contract requires three initial pairs (six entries), allows later single/pair pages, and stores every entry's UUID, name, category, description, and HTTP(S) image link. Responses are itinerary/item-scoped upserts and become immutable at completion. Completion is allowed with unanswered items, creates deduplicated orchestration version 4, and passes only recorded likes/dislikes in the selected/rejected snapshots to the worker.
 
 The full public representation, headers, examples, and invariants are in [`docs/architecture/api-contract.md`](../../docs/architecture/api-contract.md).
 
@@ -56,7 +57,7 @@ The pipeline:
 
 There is an unavoidable crash window after fal accepts a submission but before its request ID commits to Postgres. A retry can submit a duplicate billable request in that narrow window. Once the ID checkpoint commits, retries only retrieve that request.
 
-All core planning and image steps are required. Any exhausted/non-retryable failure produces public `fail`; there is no public partial success. Missing credentials use `PROVIDER_CONFIGURATION_MISSING`.
+All core planning and image steps are required. Any exhausted/non-retryable failure produces public `fail`; there is no public partial success. By default, incomplete provider credentials select the deterministic, network-free demo pipeline. Set `OFFLINE_DEMO_ENABLED=false` to require all providers and use `PROVIDER_CONFIGURATION_MISSING` for incomplete configuration.
 
 ## Dates and result data
 

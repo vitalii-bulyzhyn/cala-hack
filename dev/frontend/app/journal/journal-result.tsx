@@ -40,21 +40,38 @@ export function JournalResult({ itineraryId }: { itineraryId: string }) {
   }
 
   const result = resource.result;
+  const isOfflineDemo = result.summary.includes("offline sample journal");
   return (
     <main className={styles.resultShell}>
       <article className={styles.resultJournal}>
-        <header className={styles.resultHeader}>
-          <p className={styles.eyebrow}>{result.destination} · {result.planned_date}</p>
-          <h1>{result.title}</h1>
-          <p>{result.summary}</p>
-        </header>
+        <div className={styles.resultSpread}>
+          <header className={`${styles.resultHeader} ${styles.resultLeftPage}`}>
+            <p className={styles.eyebrow}>{result.destination} · {result.planned_date}</p>
+            <h1>{result.title}</h1>
+            <p>{result.summary}</p>
+          </header>
 
-        <figure className={styles.heroFigure}>
-          {/* The absolute, app-owned media URL is supplied by the backend. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt={result.journal_image.alt_text} src={result.journal_image.url} />
-          <figcaption>Generated illustration — use the place details below for your plan.</figcaption>
-        </figure>
+          <figure className={`${styles.heroFigure} ${styles.resultRightPage}`}>
+            {isOfflineDemo ? (
+              <div className={styles.offlineJournalMark}>
+                <p className={styles.eyebrow}>Offline sample</p>
+                <h2>{result.destination}</h2>
+                <p>Ready to test — no provider credentials used.</p>
+              </div>
+            ) : (
+              <>
+                {/* The absolute, app-owned media URL is supplied by the backend. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt={result.journal_image.alt_text} src={result.journal_image.url} />
+              </>
+            )}
+            <figcaption>
+              {isOfflineDemo
+                ? "Offline demo journal page — use the sample place details below to test the flow."
+                : "Generated illustration — use the place details below for your plan."}
+            </figcaption>
+          </figure>
+        </div>
 
         <section aria-labelledby="day-plan-title" className={styles.placeSection}>
           <div>

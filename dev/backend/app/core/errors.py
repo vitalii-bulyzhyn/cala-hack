@@ -84,12 +84,3 @@ class PreferencePageIncompleteError(AppError):
             message="Respond to every item on the current page before continuing.",
             status_code=status.HTTP_409_CONFLICT,
         )
-
-
-class PreferenceLearningIncompleteError(AppError):
-    def __init__(self) -> None:
-        super().__init__(
-            code="PREFERENCE_LEARNING_INCOMPLETE",
-            message="Respond to at least six preference items and finish the current page first.",
-            status_code=status.HTTP_409_CONFLICT,
-        )

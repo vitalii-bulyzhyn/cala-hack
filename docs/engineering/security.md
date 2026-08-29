@@ -17,7 +17,7 @@ This is a hackathon implementation, not a production security claim.
 - Official/source links must occur in Cala research; map links are constructed from encoded application data.
 - fal output must be one HTTPS image with validated type/dimensions. The copy rejects malformed/local/loopback/private targets, screens default-client DNS, revalidates every bounded redirect hop, checks magic bytes against MIME, enforces size/time limits, maps filesystem failures safely, and writes atomically under an itinerary-scoped path.
 - Successful public image URLs point to app storage, not fal.
-- Missing provider keys cause safe `PROVIDER_CONFIGURATION_MISSING` without a provider call.
+- Missing provider keys select a clearly labeled, network-free demo pipeline by default; disabling demo mode restores safe `PROVIDER_CONFIGURATION_MISSING`.
 - pgAdmin and local media serving are development/demo facilities.
 
 ## Data classification

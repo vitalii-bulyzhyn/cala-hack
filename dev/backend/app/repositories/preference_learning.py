@@ -35,10 +35,6 @@ class PreferencePageIncompleteRepositoryError(Exception):
     pass
 
 
-class PreferenceLearningIncompleteRepositoryError(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class PreferenceLearningSnapshot:
     itinerary_id: UUID
@@ -185,23 +181,6 @@ class PreferenceLearningRepository:
         if learning.status == PreferenceLearningStatus.COMPLETED:
             await self._session.rollback()
             return await self.completed_result(itinerary_id)
-        pages = await self._load_pages(itinerary_id)
-        responses = [
-            entry.response for page in pages for entry in page.entries if entry.response is not None
-        ]
-        has_answered_adaptive_page = any(
-            page.source == PreferencePageSource.ADAPTIVE
-            and page.entries
-            and all(entry.response is not None for entry in page.entries)
-            for page in pages
-        )
-        if (
-            len(responses) < 7
-            or not has_answered_adaptive_page
-            or self._first_unanswered(pages) is not None
-        ):
-            await self._session.rollback()
-            raise PreferenceLearningIncompleteRepositoryError
 
         itinerary = await self._session.scalar(
             select(Itinerary).where(Itinerary.id == itinerary_id).with_for_update()

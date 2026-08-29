@@ -5,7 +5,7 @@ Status: The monorepo, integrated Next.js flow, catalog-backed preference learnin
 ## Current implementation
 
 - `dev/frontend` creates itineraries, renders pair/single preference pages, records decisions, completes learning, polls generation, and renders terminal results/errors; it also serves the same-origin backend-health proxy.
-- `dev/backend` exposes health, provider status, city/tag create/read, preference page/response/completion endpoints, OpenAPI, and generated files below `/media`.
+- `dev/backend` exposes health, provider status, city/tag create/read, read-only issued-page listing, preference next-page/response/completion endpoints, OpenAPI, and generated files below `/media`.
 - Revisions `20260829_0001` through `20260829_0004` own the Postgres schema.
 - Compose runs frontend, backend, worker, Postgres, Redis, and pgAdmin after the one-shot migration. API and worker share a generated-media volume.
 - Postgres owns resources, lifecycle, retries, leases/fencing, plan checkpoints, fal request checkpoints, and results. Redis carries only reconstructible run-ID wake-ups and worker health.
@@ -45,16 +45,16 @@ Postgres is authoritative. A lost Redis notification can delay pickup but cannot
 - `result` is non-null only for a complete `done`; `error` is non-null only for `fail`.
 - Postgres is required for readiness. Redis is optional/degraded because durable work remains recoverable.
 - Provider status reports redacted configuration presence, not reachability, quota, or billing.
-- Missing provider keys do not prevent boot/readiness; the worker records `PROVIDER_CONFIGURATION_MISSING` for submitted work.
+- Missing provider keys do not prevent boot/readiness; by default they select the deterministic offline demo pipeline. When `OFFLINE_DEMO_ENABLED=false`, submitted work records `PROVIDER_CONFIGURATION_MISSING` instead.
 
 These boundaries are recorded in [ADR 0002](decisions/0002-backend-owned-provider-access.md), [ADR 0003](decisions/0003-generation-lifecycle.md), [ADR 0004](decisions/0004-natural-request-and-journal-artifact.md), [ADR 0005](decisions/0005-city-and-tags-input.md), and [ADR 0006](decisions/0006-preference-learning-before-generation.md).
 
 ## Current itinerary flow
 
 1. `POST /api/v1/itineraries` cleans city/tags, fingerprints them, and commits an itinerary plus collecting preference session in `learning_preferences`; it creates no run.
-2. The next-page API asks the injected algorithm for three initial pairs, persists all six immutable entries, then persists one category-learned adaptive page with one or two entries.
+2. The next-page API asks the injected algorithm for three initial pairs and persists all six immutable entries. A separate read-only API lists all issued pages so the UI can flip through them without advancing the algorithm; after the initial responses, next-page may persist one category-learned adaptive page with one or two entries.
 3. Like/dislike upserts remain tied to the itinerary and exact issued item.
-4. Preference completion requires the six initial responses plus an answered adaptive page, invokes the algorithm update hook, atomically transitions to `queued`, creates one orchestration run, and best-effort appends its UUID to Redis.
+4. Preference completion may occur with zero, partial, or complete responses and without an adaptive page. It passes only recorded likes/dislikes to the algorithm update hook, atomically transitions to `queued`, creates one orchestration run, and best-effort appends its UUID to Redis.
 5. The worker claims the run under a Postgres lease/fence and receives city, tags, and selected/rejected activity snapshots.
 6. OpenAI resolves canonical destination/timezone; planned date is the immutable UTC creation date plus seven days.
 7. Cala knowledge query and search use tags plus learned choices for grounded candidates/context.
@@ -109,7 +109,7 @@ No database transaction can atomically include fal accepting a network submissio
 
 - Persist before notifying Redis.
 - Do not create a generation run before preference learning is complete.
-- Require the six initial responses, an answered adaptive page, and no unanswered issued item at completion.
+- Treat unanswered preference items as neutral; completion uses only recorded responses and does not require an adaptive page.
 - Planned date always uses the same creation-date-plus-seven-days rule across retries.
 - Verified URLs must occur in Cala output; every place requires an app-built map link.
 - A completed plan has three to five consecutive, non-overlapping places.

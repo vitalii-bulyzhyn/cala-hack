@@ -1,6 +1,6 @@
 # Configuration
 
-Status: Environment configuration, preference-learning seam, provider-backed generation, checkpoints, and app-owned local media are **Current**. Production values/storage remain **Open**.
+Status: Environment configuration, provider-free demo generation, preference-learning seam, provider-backed generation, checkpoints, and app-owned local media are **Current**. Production values/storage remain **Open**.
 
 `.env.example` is the canonical implemented-variable inventory. This document explains ownership and safety; update both in the same change.
 
@@ -54,6 +54,7 @@ API and worker share backend settings. Current Compose runs one sequential worke
 | `OPENAI_MODEL` | No | Replaceable default `gpt-5.6-terra`. |
 | `OPENAI_TIMEOUT_SECONDS` | No | Responses call timeout, `120`. |
 | `PROVIDER_CONTEXT_MAX_CHARS` | No | Maximum serialized Cala context passed to planning, `30000`. |
+| `OFFLINE_DEMO_ENABLED` | No | Default `true`; missing provider keys produce a labeled deterministic journal instead of failure. Set `false` to require all providers. |
 | `CALA_API_KEY` | Yes | Sent only as `X-API-KEY`; required for success. |
 | `CALA_BASE_URL` | No | `https://api.cala.ai`. |
 | `CALA_TIMEOUT_SECONDS` | No | Cala HTTP timeout, `30`. |
@@ -62,7 +63,7 @@ API and worker share backend settings. Current Compose runs one sequential worke
 | `FAL_START_TIMEOUT_SECONDS` | No | Queue submission/start bound, `30`. |
 | `FAL_RESULT_TIMEOUT_SECONDS` | No | Result-wait bound per attempt, `180`. |
 
-All three keys may be blank while booting. Initial preference pages and deterministic adaptive fallback still work from the bundled catalog. With `OPENAI_API_KEY`, adaptive ranking may use the configured OpenAI model. Once generation starts, missing any generation key ends it with `PROVIDER_CONFIGURATION_MISSING`.
+All three keys may be blank. Initial/adaptive preferences and the complete offline demo journal then work without network provider calls. With `OPENAI_API_KEY`, adaptive ranking may use the configured OpenAI model. The real generation pipeline is selected only when all three generation keys exist. Set `OFFLINE_DEMO_ENABLED=false` when incomplete configuration should end with `PROVIDER_CONFIGURATION_MISSING`.
 
 Model IDs are configuration, not durable decisions. Prompt/schema versions and saved checkpoint schema belong in code and diagnostics.
 

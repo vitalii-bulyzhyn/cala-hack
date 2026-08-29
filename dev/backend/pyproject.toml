@@ -35,7 +35,7 @@ where = ["."]
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["data/*.json"]
+app = ["data/*.json", "data/*.jpg"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"

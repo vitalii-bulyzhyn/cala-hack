@@ -62,6 +62,7 @@ def test_provider_secrets_are_optional() -> None:
     assert settings.openai_configured is False
     assert settings.cala_configured is False
     assert settings.fal_configured is False
+    assert settings.offline_demo_enabled is True
 
 
 def test_invalid_log_level_is_rejected() -> None:

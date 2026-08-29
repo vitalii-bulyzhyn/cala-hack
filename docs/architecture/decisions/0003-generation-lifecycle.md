@@ -53,7 +53,7 @@ Represent generation as a durable asynchronous itinerary resource and make Postg
 - Postgres is required for API readiness.
 - Redis is optional/degraded because durable work remains reconciliable.
 - Worker health requires its hostname-scoped Redis heartbeat and a Postgres probe.
-- Provider configuration is not a readiness requirement; missing keys fail submitted jobs safely.
+- Provider configuration is not a readiness requirement. Per [ADR 0007](0007-provider-free-demo-generation.md), missing keys select offline demo generation by default; operators can disable it to make submitted jobs fail safely.
 
 ## Consequences
 

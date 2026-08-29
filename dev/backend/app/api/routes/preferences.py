@@ -38,6 +38,24 @@ def _page_response(page) -> PreferencePageResponse:  # type: ignore[no-untyped-d
 
 
 @router.get(
+    "/{itinerary_id}/preference-pages",
+    response_model=list[PreferencePageResponse],
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
+    },
+)
+async def list_preference_pages(
+    itinerary_id: UUID,
+    response: Response,
+    service: Annotated[PreferenceLearningService, Depends(get_preference_learning_service)],
+) -> list[PreferencePageResponse]:
+    pages = await service.list_pages(itinerary_id)
+    response.headers["Cache-Control"] = "no-store"
+    return [_page_response(page) for page in pages]
+
+
+@router.get(
     "/{itinerary_id}/preference-pages/next",
     response_model=PreferencePageResponse,
     responses={
