@@ -1,0 +1,369 @@
+.preferenceShell,
+.generationShell,
+.resultShell {
+  min-height: 100vh;
+  padding: clamp(1rem, 4vw, 4rem);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(182, 79, 60, 0.12), transparent 28rem),
+    radial-gradient(circle at 88% 82%, rgba(61, 115, 87, 0.1), transparent 24rem),
+    var(--desk);
+}
+
+.preferenceShell,
+.generationShell {
+  display: grid;
+  place-items: center;
+}
+
+.preferencePanel,
+.generationPanel,
+.resultJournal {
+  width: min(100%, 1120px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 31px, var(--rule) 32px),
+    var(--paper);
+  box-shadow: 0 24px 70px rgba(64, 48, 28, 0.18);
+}
+
+.preferencePanel {
+  min-height: min(760px, calc(100vh - 2rem));
+  padding: clamp(1.4rem, 4vw, 4rem);
+}
+
+.preferenceHeader {
+  max-width: 720px;
+  margin-bottom: clamp(1.5rem, 4vw, 3rem);
+}
+
+.eyebrow,
+.category {
+  margin: 0 0 0.55rem;
+  color: var(--accent-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.preferenceHeader h1,
+.generationStatus h1,
+.generationFailure h1,
+.resultHeader h1 {
+  max-width: 12ch;
+  margin: 0 0 1rem;
+  color: var(--ink);
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+}
+
+.preferenceHeader > p:last-child,
+.resultHeader > p:last-child {
+  max-width: 58ch;
+  margin-bottom: 0;
+  color: var(--muted-ink);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.activityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 3vw, 2rem);
+}
+
+.singleGrid {
+  grid-template-columns: minmax(0, 620px);
+  justify-content: center;
+}
+
+.activityCard {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(70, 58, 39, 0.2);
+  border-radius: 6px 14px 8px 12px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 3px 6px 0 rgba(70, 58, 39, 0.07);
+}
+
+.activityImage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--paper-deep);
+}
+
+.activityCopy {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(1.1rem, 3vw, 1.7rem);
+}
+
+.activityCopy h2,
+.placeSection h2,
+.placeCard h3 {
+  margin: 0 0 0.7rem;
+  color: var(--ink);
+}
+
+.activityCopy > p:not(.category) {
+  flex: 1;
+  margin-bottom: 1.4rem;
+  line-height: 1.55;
+}
+
+.activityCopy button,
+.flowError button,
+.generationFailure a,
+.resultFooter > a {
+  min-height: 46px;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--accent-dark);
+  border-radius: 999px;
+  color: var(--paper);
+  background: var(--accent);
+  box-shadow: 0 3px 0 var(--accent-dark);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.activityCopy button:hover,
+.flowError button:hover,
+.generationFailure a:hover,
+.resultFooter > a:hover {
+  background: var(--accent-dark);
+}
+
+.activityCopy button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.singleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.activityCopy .secondaryButton {
+  color: var(--accent-dark);
+  background: transparent;
+  box-shadow: none;
+}
+
+.activityCopy .secondaryButton:hover {
+  color: var(--paper);
+}
+
+.loadingMessage {
+  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-size: 1.4rem;
+}
+
+.flowError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(134, 56, 45, 0.32);
+  border-radius: 8px;
+  background: rgba(182, 79, 60, 0.08);
+}
+
+.flowError p {
+  margin: 0;
+}
+
+.generationPanel {
+  display: grid;
+  min-height: min(620px, calc(100vh - 2rem));
+  place-items: center;
+  padding: clamp(2rem, 8vw, 7rem);
+}
+
+.generationStatus,
+.generationFailure {
+  display: grid;
+  max-width: 620px;
+  justify-items: center;
+  text-align: center;
+}
+
+.generationStatus h1,
+.generationFailure h1 {
+  max-width: 14ch;
+}
+
+.generationFailure > p:not(.eyebrow) {
+  max-width: 48ch;
+}
+
+.generationFailure a {
+  margin-top: 1rem;
+}
+
+.requestId,
+.transportNote {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.inkLoader {
+  display: flex;
+  gap: 0.7rem;
+  margin: 1.5rem 0;
+}
+
+.inkLoader span {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: inkPulse 1.2s ease-in-out infinite;
+}
+
+.inkLoader span:nth-child(2) { animation-delay: 160ms; }
+.inkLoader span:nth-child(3) { animation-delay: 320ms; }
+
+@keyframes inkPulse {
+  0%, 70%, 100% { opacity: 0.3; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-6px); }
+}
+
+.resultJournal {
+  margin-inline: auto;
+  padding: clamp(1.25rem, 5vw, 5rem);
+}
+
+.resultHeader {
+  margin-bottom: clamp(2rem, 5vw, 4rem);
+}
+
+.resultHeader h1 {
+  max-width: 16ch;
+}
+
+.heroFigure {
+  margin: 0 0 clamp(3rem, 7vw, 6rem);
+}
+
+.heroFigure img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--paper-deep);
+  box-shadow: 4px 8px 0 rgba(70, 58, 39, 0.09);
+}
+
+.heroFigure figcaption {
+  margin-top: 0.75rem;
+  color: var(--muted-ink);
+  font-size: 0.82rem;
+}
+
+.placeSection > div:first-child {
+  margin-bottom: 1.5rem;
+}
+
+.placeList {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.placeCard {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.22fr) 1fr;
+  gap: clamp(1rem, 4vw, 3rem);
+  padding: clamp(1.2rem, 3vw, 2rem);
+  background: rgba(255, 250, 240, 0.94);
+}
+
+.placeCard time {
+  color: var(--accent-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.placeCard p {
+  max-width: 65ch;
+  line-height: 1.55;
+}
+
+.placeCard address {
+  margin-bottom: 1rem;
+  color: var(--muted-ink);
+  font-style: normal;
+}
+
+.reason {
+  padding-left: 1rem;
+  border-left: 2px solid var(--accent);
+  font-style: italic;
+}
+
+.placeLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1.2rem;
+}
+
+.placeLinks a {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.resultFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.resultFooter p {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 700px) {
+  .activityGrid,
+  .placeCard {
+    grid-template-columns: 1fr;
+  }
+
+  .activityCopy {
+    min-height: 0;
+  }
+
+  .resultFooter,
+  .flowError {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inkLoader span { animation: none; opacity: 1; }
+}

@@ -1,0 +1,314 @@
+.flowShell {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 16% 16%, rgba(182, 79, 60, 0.11), transparent 30rem),
+    radial-gradient(circle at 84% 82%, rgba(63, 117, 108, 0.08), transparent 26rem),
+    var(--paper);
+}
+
+.flowContent {
+  position: relative;
+  display: grid;
+  width: min(88vw, 520px);
+  place-items: center;
+}
+
+.entryShell {
+  overflow-x: hidden;
+  overflow-y: auto;
+  place-items: start center;
+}
+
+.entryShell .flowContent {
+  width: min(90vw, 760px);
+  margin-block: auto;
+  padding-block: 1rem;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.startForm {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100%;
+  gap: 1.2rem;
+}
+
+.locationField,
+.preferenceGroups {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.fieldLabel,
+.preferenceLegend {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.queryInput {
+  width: 100%;
+  min-height: 4rem;
+  padding: 0.95rem 1.35rem;
+  border: 1px solid rgba(70, 58, 39, 0.26);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 12px 32px rgba(64, 48, 28, 0.1);
+  font-size: 1.05rem;
+  line-height: 1.3;
+  outline: none;
+}
+
+.queryInput::placeholder {
+  color: var(--muted-ink);
+  opacity: 0.86;
+}
+
+.queryInput:hover {
+  border-color: rgba(70, 58, 39, 0.44);
+}
+
+.queryInput:focus-visible {
+  border-color: var(--accent-dark);
+  box-shadow:
+    0 0 0 3px var(--focus),
+    0 12px 32px rgba(64, 48, 28, 0.1);
+}
+
+.queryInput[aria-invalid="true"] {
+  border-color: var(--accent-dark);
+}
+
+.formError {
+  margin: -0.2rem 0 0;
+  color: var(--accent-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.preferenceGroups {
+  gap: 1rem;
+}
+
+.preferenceFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.preferenceLegend {
+  margin-bottom: 0.55rem;
+  padding: 0;
+}
+
+.preferenceOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.preferenceChip {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.58rem 0.85rem;
+  border: 1px solid rgba(70, 58, 39, 0.22);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: 0 5px 16px rgba(64, 48, 28, 0.06);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.preferenceChip:hover {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.preferenceChip[aria-pressed="true"] {
+  border-color: var(--accent-dark);
+  color: var(--paper);
+  background: var(--accent-dark);
+  box-shadow: 0 6px 18px rgba(134, 56, 45, 0.2);
+}
+
+.preferenceChip:active {
+  transform: translateY(1px);
+}
+
+.preferenceChip:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.preferenceEmoji {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.startButton {
+  width: min(100%, 11rem);
+  min-height: 4rem;
+  justify-self: end;
+  padding: 0.8rem 1.2rem;
+  border: 1px solid var(--accent-dark);
+  border-radius: 999px;
+  color: var(--paper);
+  background: var(--accent);
+  box-shadow: 0 3px 0 var(--accent-dark);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.startButton:hover {
+  background: var(--accent-dark);
+}
+
+.startButton:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.startButton:active {
+  box-shadow: 0 1px 0 var(--accent-dark);
+  transform: translateY(2px);
+}
+
+.startButton:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.creatingStatus {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.creatingTitle {
+  max-width: 12ch;
+  margin: 0;
+  color: var(--accent-dark);
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(2.6rem, 9vw, 5rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.creatingDots {
+  display: inline-flex;
+  min-width: 0.9em;
+  justify-content: flex-start;
+  letter-spacing: 0.04em;
+}
+
+.creatingDots span {
+  display: inline-block;
+  animation: ink-dot 1.2s ease-in-out infinite;
+}
+
+.creatingDots span:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.creatingDots span:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+@keyframes ink-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 420px) {
+  .entryShell {
+    padding-inline: 0.75rem;
+  }
+
+  .entryShell .flowContent {
+    width: 100%;
+  }
+
+  .queryInput,
+  .startButton {
+    min-height: 3.75rem;
+  }
+
+  .startButton {
+    width: 100%;
+  }
+
+  .preferenceChip {
+    padding-inline: 0.72rem;
+    font-size: 0.84rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startButton {
+    transition: none;
+  }
+
+  .preferenceChip {
+    transition: none;
+  }
+
+  .creatingDots span {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -1,0 +1,82 @@
+# Product overview
+
+Status: City/tag creation, catalog-backed preference learning, downstream generation, and the integrated traveler-facing flow are **Current**. Production deployment/storage and broader browser automation remain **Open**.
+
+## Product promise
+
+Given a destination city and initial tags, Travel Journal learns from a short sequence of visual activity choices, then creates a grounded one-day plan and hand-drawn journal image. The result also exposes structured, ordered place details and usable links outside the image.
+
+The product is travel inspiration. It is not a booking service, navigation tool, or guarantee of live hours, availability, prices, accessibility, or journey times.
+
+## User and job
+
+The initial user knows roughly where and how they want to spend a day but does not want to research, verify, arrange, and visualize it manually.
+
+Their job is: “Turn this idea for a day away into a believable plan I can understand and get excited about.”
+
+Example input:
+
+- City: `Barcelona`
+- Tags: `art`, `old streets`, `local food`, `relaxed pace`
+
+## Current core flow
+
+1. The user submits a city and zero to twenty preference tags.
+2. The API persists a durable resource in `learning_preferences` and returns its ID.
+3. The frontend requests the next preference page. The first algorithm call supplies three pairs (six activities); later pages may show one activity across a spread or a pair, one per page.
+4. Every issued activity is stored with image link, name, category, and description. Each like/dislike response is stored against the itinerary and exact item.
+5. After the six initial answers and one answered adaptive page, completion updates the learning algorithm and only then creates the worker run.
+6. The worker uses city, tags, selected activities, and rejected activities while researching/planning, then checkpoints and illustrates the journal as before.
+7. The user receives either `done` with one journal image and linked places, or `fail` with a safe error.
+
+See [Architecture overview](../architecture/overview.md) for the durable sequence and [Experience](experience.md) for the current UI.
+
+## Product principles
+
+### Visual delight, structured truth
+
+The journal image is the emotional artifact, not the only carrier of information. Destination, date, summary, schedule, locations, and links remain structured HTML-readable data. The image uses short labels rather than dense itinerary text.
+
+### Grounded before eloquent
+
+Cala supplies place research. OpenAI may select and phrase only supported place data; verified `official` and `source` URLs must occur verbatim in Cala evidence. Every place also gets an app-created map-search link.
+
+### Deterministic date
+
+The planned day is seven days after the immutable UTC date on which the resource was created. Date selection is not part of the current create contract.
+
+### Learn before generating
+
+Generation never starts at initial submission. Stable issued-item IDs make reload/retry show the same choice, and completion requires the initial six responses plus an answered adaptive page. The default algorithm covers food, drinks/party, culture, and nature from an extendable catalog; it ranks locally and can use OpenAI only to rerank unseen adaptive choices.
+
+### Honest terminal outcomes
+
+The plan and the hero image are both core. A missing provider, invalid plan, unsafe/failed image, exhausted retry, or media-copy failure produces `fail`; the API never labels incomplete output `done`.
+
+### Durable progress without provider leakage
+
+Public status stays `pending`, `done`, or `fail`; a pending `stage` gives useful product language. Provider request IDs, raw evidence, leases, attempts, and checkpoint payloads remain private.
+
+## Success signals
+
+- Valid city/tag input creates a durable learning session; a configured algorithm can issue six initial options and record every response.
+- Completing learning creates exactly one generation run that receives the selected/rejected activity snapshot.
+- The result has a resolved destination, planned date, IANA timezone, title, summary, three to five non-overlapping places, one map link per place, and exactly one app-owned hero image.
+- Every verified link is grounded in Cala output, and no unsupported live claim is presented as fact.
+- Retries reuse saved plan and fal-request checkpoints after they commit.
+- The result remains understandable without reading text rendered into the image.
+- The demo can be repeated with known credentials, bounded cost, and diagnosable safe failures.
+
+## Glossary
+
+- **Itinerary resource** — durable city/tag request and preference-learning owner, identified by UUID.
+- **Public status** — `pending`, `done`, or `fail`.
+- **Pending stage** — `learning_preferences`, `queued`, `researching`, `planning`, or `illustrating` while status is `pending`.
+- **Preference page** — one journal opening with a `single` or `pair` activity layout.
+- **Preference entry** — immutable displayed activity JSON with ID, image link, name, category, and description.
+- **Place** — an ordered local-time stop with structured details and typed links.
+- **Journal image** — the single itinerary-level hero copied into app-owned media storage.
+- **Plan checkpoint** — immutable application-owned plan used to resume after research/planning.
+- **Image checkpoint** — persisted fal provider/model/request ID used to resume retrieval without resubmission.
+
+Implementation status is sequenced in the [Delivery plan](delivery-plan.md).

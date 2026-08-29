@@ -1,0 +1,192 @@
+name: travel-journal
+
+x-backend-environment: &backend-environment
+  APP_NAME: ${APP_NAME:-Travel Journal API}
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  BACKEND_CORS_ORIGINS: '${BACKEND_CORS_ORIGINS:-["http://localhost:3000"]}'
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-travel_journal}:${POSTGRES_PASSWORD:-travel_journal}@postgres:5432/${POSTGRES_DB:-travel_journal}
+  REDIS_URL: redis://redis:6379/0
+  REDIS_CONNECT_TIMEOUT_SECONDS: ${REDIS_CONNECT_TIMEOUT_SECONDS:-2}
+  REDIS_OPERATION_TIMEOUT_SECONDS: ${REDIS_OPERATION_TIMEOUT_SECONDS:-5}
+  READINESS_TIMEOUT_SECONDS: ${READINESS_TIMEOUT_SECONDS:-2}
+  GENERATION_QUEUE_KEY: ${GENERATION_QUEUE_KEY:-travel-journal:generation:queued}
+  GENERATION_MAX_ATTEMPTS: ${GENERATION_MAX_ATTEMPTS:-3}
+  GENERATION_RETRY_BASE_SECONDS: ${GENERATION_RETRY_BASE_SECONDS:-5}
+  WORKER_NAME: ${WORKER_NAME:-generation-worker}
+  WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-2}
+  WORKER_HEARTBEAT_KEY: ${WORKER_HEARTBEAT_KEY:-travel-journal:generation:worker:heartbeat}
+  WORKER_HEARTBEAT_SECONDS: ${WORKER_HEARTBEAT_SECONDS:-5}
+  WORKER_HEARTBEAT_TTL_SECONDS: ${WORKER_HEARTBEAT_TTL_SECONDS:-15}
+  WORKER_RECONCILE_SECONDS: ${WORKER_RECONCILE_SECONDS:-5}
+  WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-60}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-terra}
+  OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-120}
+  PROVIDER_CONTEXT_MAX_CHARS: ${PROVIDER_CONTEXT_MAX_CHARS:-30000}
+  CALA_API_KEY: ${CALA_API_KEY:-}
+  CALA_BASE_URL: ${CALA_BASE_URL:-https://api.cala.ai}
+  CALA_TIMEOUT_SECONDS: ${CALA_TIMEOUT_SECONDS:-30}
+  FAL_KEY: ${FAL_KEY:-}
+  FAL_IMAGE_MODEL: ${FAL_IMAGE_MODEL:-fal-ai/flux/schnell}
+  FAL_START_TIMEOUT_SECONDS: ${FAL_START_TIMEOUT_SECONDS:-30}
+  FAL_RESULT_TIMEOUT_SECONDS: ${FAL_RESULT_TIMEOUT_SECONDS:-180}
+  MEDIA_STORAGE_PATH: /data/generated-media
+  MEDIA_URL_PATH: ${MEDIA_URL_PATH:-/media}
+  MEDIA_DOWNLOAD_TIMEOUT_SECONDS: ${MEDIA_DOWNLOAD_TIMEOUT_SECONDS:-30}
+  MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-15000000}
+
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-travel_journal}
+      POSTGRES_USER: ${POSTGRES_USER:-travel_journal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-travel_journal}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:8.8.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:9.17
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@traveljournal.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./infra/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/misc/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  migrate:
+    build:
+      context: ./dev/backend
+    init: true
+    restart: "no"
+    environment: *backend-environment
+    command: ["alembic", "upgrade", "head"]
+    volumes:
+      - ./dev/backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./dev/backend
+    init: true
+    restart: unless-stopped
+    environment: *backend-environment
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./dev/backend:/app
+      - generated_media:/data/generated-media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  worker:
+    build:
+      context: ./dev/backend
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 40s
+    environment: *backend-environment
+    command: ["python", "-m", "app.worker"]
+    volumes:
+      - ./dev/backend:/app
+      - generated_media:/data/generated-media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.worker.healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./dev/frontend
+      target: development
+    init: true
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:${BACKEND_PORT:-8000}
+      WATCHPACK_POLLING: "true"
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./dev/frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+  frontend_node_modules:
+  frontend_next:
+  generated_media:

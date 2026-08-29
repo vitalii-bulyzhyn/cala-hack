@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1400" role="img" aria-labelledby="title description">
+  <title id="title">Decorative cream journal paper</title>
+  <desc id="description">A blank ruled journal page with a red margin, faded map marks, and hand-drawn corner decorations.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fffdf5"/>
+      <stop offset="0.55" stop-color="#fbf3df"/>
+      <stop offset="1" stop-color="#f4e7ca"/>
+    </linearGradient>
+    <pattern id="rules" width="1000" height="58" patternUnits="userSpaceOnUse">
+      <path d="M0 57.5H1000" fill="none" stroke="#78969b" stroke-opacity=".22" stroke-width="2"/>
+    </pattern>
+    <filter id="paper-noise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence baseFrequency=".65" numOctaves="4" seed="17" type="fractalNoise"/>
+      <feColorMatrix values="0 0 0 0 .43 0 0 0 0 .34 0 0 0 0 .22 0 0 0 .075 0"/>
+    </filter>
+    <filter id="soften">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="1400" fill="url(#paper)"/>
+  <rect width="1000" height="1400" fill="#6b5338" filter="url(#paper-noise)" opacity=".32"/>
+  <circle cx="820" cy="175" r="155" fill="#d69b74" opacity=".12" filter="url(#soften)"/>
+  <circle cx="135" cy="1170" r="190" fill="#6c9b91" opacity=".1" filter="url(#soften)"/>
+  <rect y="122" width="1000" height="1160" fill="url(#rules)"/>
+  <path d="M142 0V1400" fill="none" stroke="#c86a60" stroke-opacity=".42" stroke-width="3"/>
+  <path d="M156 0V1400" fill="none" stroke="#c86a60" stroke-opacity=".14" stroke-width="2"/>
+
+  <g fill="none" stroke="#3f756c" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" opacity=".24">
+    <path d="M758 112c54 37 70 86 54 145-13 49 6 89 58 120"/>
+    <path d="M780 151c24-28 48-37 72-25-3 29-24 47-62 54"/>
+    <path d="M812 234c31-22 60-25 87-8-9 31-36 44-79 38"/>
+    <path d="M187 1185c60-50 123-56 188-20 55 31 112 28 171-9"/>
+  </g>
+
+  <g fill="none" stroke="#b64f3c" stroke-linecap="round" stroke-width="6" opacity=".28">
+    <path d="M705 1192c54-46 120-48 198-6"/>
+    <path d="M726 1216c47-33 99-34 156-4"/>
+    <path d="M72 175c24 16 39 39 44 69"/>
+    <path d="M63 206c21-8 42-7 62 4"/>
+  </g>
+
+  <path d="M231 1013c75-42 151-47 230-16 70 28 139 20 207-23 60-38 120-38 180 0" fill="none" stroke="#8d7556" stroke-dasharray="8 17" stroke-linecap="round" stroke-width="5" opacity=".18"/>
+  <circle cx="231" cy="1013" r="12" fill="#a74938" opacity=".25"/>
+  <circle cx="848" cy="974" r="12" fill="#a74938" opacity=".25"/>
+
+  <path d="M0 0h1000v1400H0z" fill="none" stroke="#745b3d" stroke-opacity=".17" stroke-width="12"/>
+</svg>

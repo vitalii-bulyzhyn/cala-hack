@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Travel Journal Postgres",
+      "Group": "Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "travel_journal",
+      "Username": "travel_journal",
+      "SSLMode": "prefer"
+    }
+  }
+}
