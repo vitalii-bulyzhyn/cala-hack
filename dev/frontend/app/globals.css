@@ -139,7 +139,8 @@ h2 {
 h1 {
   max-width: 9ch;
   margin-bottom: 1.25rem;
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(3.35rem, 8vw, 6.25rem);
   font-weight: 500;
   letter-spacing: -0.055em;
@@ -209,7 +210,7 @@ p {
   margin: 0;
   padding-left: 1rem;
   border-left: 2px solid rgba(192, 82, 63, 0.7);
-  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print", cursive;
   font-size: 1.05rem;
   transform: rotate(-1deg);
 }

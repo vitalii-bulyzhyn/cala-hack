@@ -46,25 +46,35 @@ function PreferenceFace({ entry, pageNumber }: PreferenceFaceProps) {
   return (
     <article
       aria-label={`Preference journal page ${pageNumber}: ${entry.name}`}
-      className={styles.preferenceJournalFace}
+      className={`${styles.preferenceJournalFace} ${
+        pageNumber % 2 === 1
+          ? styles.preferenceRightFace
+          : styles.preferenceLeftFace
+      }`}
       style={{ backgroundImage: `url(${background})` }}
     >
-      <figure className={styles.preferencePhoto}>
-        {/* Activity image URLs are supplied by the backend catalog. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          alt={`${entry.name} travel inspiration`}
-          crossOrigin="anonymous"
-          draggable={false}
-          src={entry.image_link}
-        />
-      </figure>
-      <div className={styles.preferenceFaceCopy}>
-        <p className={styles.category}>
-          {CATEGORY_LABELS[entry.category] ?? entry.category}
-        </p>
-        <h2>{entry.name}</h2>
-        <p>{entry.description}</p>
+      <div className={styles.preferenceFaceContent}>
+        <div className={styles.preferenceFaceCopy}>
+          <h2>{entry.name}</h2>
+          <p>{entry.description}</p>
+        </div>
+
+        <figure className={styles.preferenceIllustration}>
+          <span aria-hidden="true" className={styles.preferenceTape} />
+          <span className={styles.preferenceImageFrame}>
+            {/* Activity image URLs are supplied by the backend catalog. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={`${entry.name} travel inspiration`}
+              crossOrigin="anonymous"
+              draggable={false}
+              src={entry.image_link}
+            />
+          </span>
+          <figcaption>
+            {CATEGORY_LABELS[entry.category] ?? entry.category}
+          </figcaption>
+        </figure>
       </div>
       <span aria-hidden="true" className={styles.preferenceFacePageNumber}>
         {String(pageNumber).padStart(2, "0")}

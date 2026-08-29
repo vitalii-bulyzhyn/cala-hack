@@ -133,7 +133,8 @@
 .faceTitle {
   max-width: 9ch;
   margin: 0 0 6cqw;
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(0.9rem, 8.5cqw, 2.3rem);
   font-weight: 500;
   letter-spacing: -0.035em;
