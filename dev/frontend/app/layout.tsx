@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Caveat } from "next/font/google";
 
 import "./globals.css";
+
+const handwriting = Caveat({
+  display: "swap",
+  subsets: ["latin"],
+  variable: "--font-handwriting",
+  weight: "variable",
+});
 
 export const metadata: Metadata = {
   title: "Travel Journal",
@@ -13,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html className={handwriting.variable} lang="en">
       <body>{children}</body>
     </html>
   );
