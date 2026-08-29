@@ -132,15 +132,9 @@ class PreferenceLearningRepository:
         learning = await self._locked_learning(itinerary_id)
         self._ensure_collecting(learning)
         pages = await self._load_pages(itinerary_id)
-        existing = next(
-            (page for page in pages if page.source == PreferencePageSource.ADAPTIVE),
-            None,
-        )
-        if existing is not None:
-            return existing
-        if len(pages) != expected_page_count or len(pages) != 3:
-            raise PreferencePageIncompleteRepositoryError
-        if any(entry.response is None for page in pages for entry in page.entries):
+        if len(pages) == expected_page_count + 1:
+            return pages[-1]
+        if len(pages) != expected_page_count or len(pages) < 3:
             raise PreferencePageIncompleteRepositoryError
 
         page = self._page_from_suggestion(

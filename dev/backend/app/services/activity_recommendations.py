@@ -137,23 +137,22 @@ class ActivityRecommendationAlgorithm:
         self,
         city: str,
         tags: tuple[str, ...],
+        issued_activities: tuple[Activity, ...],
         selected_activities: tuple[Activity, ...],
         rejected_activities: tuple[Activity, ...],
         algorithm_state: PreferenceAlgorithmState,
     ) -> PreferencePageSuggestion | None:
-        answered_count = len(selected_activities) + len(rejected_activities)
-        if answered_count >= 7:
-            return None
-        if answered_count < 6:
-            raise ValueError("adaptive ranking requires all six initial responses")
+        if len(issued_activities) < 6:
+            raise ValueError("adaptive selection requires six issued initial activities")
 
         ranked = await self._rank_remaining(
             city,
             tags,
+            issued_activities,
             selected_activities,
             rejected_activities,
         )
-        seen_names = {activity.name for activity in (*selected_activities, *rejected_activities)}
+        seen_names = {activity.name for activity in issued_activities}
         available_categories = tuple(
             category
             for category in CATEGORIES
@@ -242,12 +241,13 @@ class ActivityRecommendationAlgorithm:
         self,
         city: str,
         tags: tuple[str, ...],
+        issued: tuple[Activity, ...],
         selected: tuple[Activity, ...],
         rejected: tuple[Activity, ...],
     ) -> dict[ActivityCategory, list[Activity]]:
         entries = self._entries_for_city(city)
         full_ranking = self._local_rank(city, tags, selected, rejected, entries)
-        seen_names = {activity.name for activity in (*selected, *rejected)}
+        seen_names = {activity.name for activity in issued}
         fallback = {
             category: [activity for activity in activities if activity.name not in seen_names]
             for category, activities in full_ranking.items()

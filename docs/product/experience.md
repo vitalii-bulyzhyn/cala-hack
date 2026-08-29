@@ -23,7 +23,7 @@ The primary task is: choose a city and tags, react to visual activity options in
 - Keep like and dislike controls on every activity face, restore their pressed state from `decision`, and allow page turns whether or not the current face has a response. Repeating a selected control returns that item to neutral.
 - After a newly explicit like or dislike is saved, advance to the next journal opening when one remains. Returning a selected item to neutral stays on the current opening.
 - The integrated flow shows the three initial pairs as six faces and lets the traveler create the journal from the final face whether they answered all, some, or none. Unanswered activities are neutral.
-- After all six initial items have explicit decisions, the integrated UI automatically requests and opens the optional adaptive page. A `204` means there is no further page. If that automatic request fails, “Refine my preferences” remains available to retry; refinement is never required for completion.
+- Immediately after the six initial items are issued, the integrated UI automatically requests the optional adaptive page. Thompson Sampling uses prior arms when no decisions exist, and already-issued activities are excluded. A `204` means there is no further page. If that automatic request fails, “Refine my preferences” remains available to retry; refinement is never required for completion.
 - The frontend calls completion when the traveler finishes the preference book; generation begins from its `202` response using only recorded likes/dislikes.
 - Initial suggestions work without provider keys. Adaptive OpenAI reranking falls back deterministically when unavailable.
 

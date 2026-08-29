@@ -25,7 +25,7 @@ Example input:
 2. The API persists a durable resource in `learning_preferences` and returns its ID.
 3. The frontend requests the next preference page. The first algorithm call supplies three pairs (six activities); later pages may show one activity across a spread or a pair, one per page.
 4. Every issued activity is stored with name, category, journal prose, optional media, and private grounding metadata. Full-page feedback atomically updates exact-item responses and reconstructs durable bandit state.
-5. From the final preference face, the user can complete with zero, partial, or complete responses, or optionally refine after six explicit initial decisions. Completion finalizes state and creates the worker run under one session lock.
+5. The UI automatically requests one Thompson-selected adaptive page after issuing the initial six, using prior arms if the traveler has not rated anything. From the final preference face, the user can complete with zero, partial, or complete responses. Completion finalizes state and creates the worker run under one session lock.
 6. The worker uses city, tags, selected activities, and rejected activities while researching/planning, then checkpoints and illustrates the journal as before.
 7. The user receives either `done` with one journal image and linked places, or `fail` with a safe error.
 

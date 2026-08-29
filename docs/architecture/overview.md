@@ -52,7 +52,7 @@ These boundaries are recorded in [ADR 0002](decisions/0002-backend-owned-provide
 ## Current itinerary flow
 
 1. `POST /api/v1/itineraries` cleans city/tags, fingerprints them, and commits an itinerary plus collecting preference session in `learning_preferences`; it creates no run.
-2. The next-page API asks the injected algorithm for three initial pairs and persists all six immutable entries. A separate read-only API lists all issued pages so the UI can flip through them without advancing the algorithm; after the initial responses, next-page may persist one category-learned adaptive page with one or two entries.
+2. The next-page API asks the injected algorithm for three initial pairs and persists all six immutable entries. A separate read-only API lists all issued pages so the UI can flip through them without advancing the algorithm; the following next-page call persists one Thompson-selected adaptive page with one or two unseen entries, using prior arms when no ratings exist.
 3. One atomic page-feedback write validates page/item ownership, applies likes/dislikes/nulls, and reconstructs the versioned Thompson-sampling state from durable responses.
 4. Preference completion may occur with zero, partial, or complete responses and without an adaptive page. Under the learning lock it finalizes state, atomically transitions to `queued`, creates one orchestration run, and best-effort appends its UUID to Redis after commit.
 5. The worker claims the run under a Postgres lease/fence and receives city, tags, and selected/rejected activity snapshots.

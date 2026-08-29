@@ -315,12 +315,12 @@
 
 .preferencePhoto {
   width: auto;
-  height: 100%;
+  height: auto;
   max-height: 48cqh;
   min-height: 0;
   margin: 9cqw 10cqw 2.2cqw;
   padding: 2.2cqw;
-  align-self: end;
+  align-self: stretch;
   overflow: hidden;
   border-radius: 1.5cqw;
   background: rgba(255, 253, 247, 0.96);
@@ -375,7 +375,7 @@
   max-width: 13ch;
   margin: 0 0 2.2cqw;
   font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
-  font-size: clamp(1rem, 7.5cqw, 2.1rem);
+  font-size: clamp(0.72rem, 7.5cqw, 2.1rem);
   font-weight: 500;
   letter-spacing: -0.04em;
   line-height: 0.94;

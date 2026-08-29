@@ -81,7 +81,7 @@ GET /api/v1/itineraries/{itinerary_id}/preference-pages
 
 Returns a JSON array of every persisted preference page in ascending `position`, using the same page and entry shape documented below. Each entry includes its current nullable `decision`, so the client can restore votes while letting the traveler flip among all issued faces. The response is `[]` before any page has been issued and uses `Cache-Control: no-store`.
 
-This endpoint is strictly read-only: it does not call the preference algorithm, create an initial or adaptive page, require a response on the current page, or change learning/completion state. The client first calls `GET .../preference-pages/next` to issue the three initial pairs, then can use this collection endpoint to render and navigate all six initial activity faces without voting first. If all issued entries are answered, `GET .../next` remains the only operation that can optionally issue an adaptive page or return `204`; clients may instead complete learning directly.
+This endpoint is strictly read-only: it does not call the preference algorithm, create an initial or adaptive page, require a response on the current page, or change learning/completion state. The client first calls `GET .../preference-pages/next` to issue the three initial pairs, then can use this collection endpoint to render and navigate all six initial activity faces without voting first. A subsequent `GET .../next` remains the only operation that can issue the adaptive page or return `204`; it does not require ratings and uses Thompson Sampling priors when none exist. Clients may instead complete learning directly.
 
 ### Get the next page
 
@@ -89,7 +89,7 @@ This endpoint is strictly read-only: it does not call the preference algorithm, 
 GET /api/v1/itineraries/{itinerary_id}/preference-pages/next
 ```
 
-The first call asks the algorithm for exactly three initial pairs, persists all six activities as three pages, and returns page one. Repeated calls return the earliest page with unanswered entries; use the read-only collection endpoint above when the UI needs to browse the other already-issued pages before responding. After every issued entry has a response, the algorithm may return an adaptive page containing either one activity or a pair. `204 No Content` means it has no next page. Responses use `Cache-Control: no-store`.
+The first call asks the algorithm for exactly three initial pairs, persists all six activities as three pages, and returns page one. Once those pages exist, the next call uses Thompson Sampling to persist an adaptive page containing either one new activity or a pair, even if every initial entry is neutral. Already-issued activities cannot be selected again. After the adaptive page exists, `204 No Content` means there is no further page. Use the read-only collection endpoint above to browse every issued page. Responses use `Cache-Control: no-store`.
 
 ```json
 {

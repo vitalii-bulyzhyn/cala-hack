@@ -199,6 +199,7 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
   const [loading, setLoading] = useState(true);
   const [submittingEntryId, setSubmittingEntryId] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
+  const [inventoryExhausted, setInventoryExhausted] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const {
@@ -209,11 +210,6 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
 
   const entries = useMemo(() => flattenEntries(pages), [pages]);
   const totalFaces = entries.length;
-  const initialEntries = entries.filter((entry) => entry.source === "initial");
-  const canRefine =
-    initialEntries.length > 0 &&
-    initialEntries.every((entry) => entry.decision !== null) &&
-    !entries.some((entry) => entry.source === "adaptive");
   const lastBookPage = terminalBookPage(totalFaces);
   const visibleEntries = visibleEntryIndexes(bookPage, totalFaces);
   const measuredWidth = availableWidth || MIN_PAGE_WIDTH * 2 + BOOK_SIDE_CLEARANCE;
@@ -241,6 +237,27 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     setPages(issuedPages);
     return issuedPages;
   }, [itineraryId]);
+
+  const loadMoreActivities = useCallback(async () => {
+    setRefining(true);
+    setError(null);
+    try {
+      const nextPage = await getNextPreferencePage(itineraryId);
+      if (!nextPage) {
+        setInventoryExhausted(true);
+        return;
+      }
+      await refreshIssuedPages();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not load more activities.",
+      );
+    } finally {
+      setRefining(false);
+    }
+  }, [itineraryId, refreshIssuedPages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +326,27 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     return () => window.removeEventListener("keydown", handleArrowKey);
   }, [lastBookPage]);
 
+  useEffect(() => {
+    if (
+      loading ||
+      refining ||
+      inventoryExhausted ||
+      pages.length < 3 ||
+      bookPage !== lastBookPage
+    ) {
+      return;
+    }
+    void loadMoreActivities();
+  }, [
+    bookPage,
+    inventoryExhausted,
+    lastBookPage,
+    loadMoreActivities,
+    loading,
+    pages.length,
+    refining,
+  ]);
+
   async function rateEntry(
     entry: IssuedEntry,
     decision: "like" | "dislike",
@@ -352,32 +390,7 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
       );
       setPages(updatedPages);
 
-      const updatedEntries = flattenEntries(updatedPages);
-      const updatedInitialEntries = updatedEntries.filter(
-        (candidate) => candidate.source === "initial",
-      );
-      const shouldFetchAdaptivePage =
-        updatedInitialEntries.length > 0 &&
-        updatedInitialEntries.every((candidate) => candidate.decision !== null) &&
-        !updatedEntries.some((candidate) => candidate.source === "adaptive");
-      let openedAdaptivePage = false;
-
-      if (shouldFetchAdaptivePage) {
-        setRefining(true);
-        try {
-          openedAdaptivePage = await issueAdaptivePage();
-        } catch (caught) {
-          setError(
-            caught instanceof Error
-              ? caught.message
-              : "Could not load the refined activities.",
-          );
-        } finally {
-          setRefining(false);
-        }
-      }
-
-      if (nextDecision !== null && !openedAdaptivePage) {
+      if (nextDecision !== null) {
         setBookPage((currentPage) =>
           currentPage < lastBookPage
             ? nextBookPage(currentPage, lastBookPage)
@@ -400,38 +413,6 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     }
   }
 
-  async function issueAdaptivePage(): Promise<boolean> {
-    const adaptive = await getNextPreferencePage(itineraryId);
-    const issued = await refreshIssuedPages();
-    if (!adaptive) return false;
-
-    const nextEntries = flattenEntries(issued);
-    const firstAdaptiveEntry = nextEntries.findIndex(
-      (entry) => entry.source === "adaptive",
-    );
-    if (firstAdaptiveEntry === -1) return false;
-
-    setBookPage(bookPageForEntryIndex(firstAdaptiveEntry));
-    return true;
-  }
-
-  async function refinePreferences() {
-    if (refining || !canRefine) return;
-    setRefining(true);
-    setError(null);
-    try {
-      await issueAdaptivePage();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not refine your preferences.",
-      );
-    } finally {
-      setRefining(false);
-    }
-  }
-
   async function finishLearning() {
     if (finishing) return;
     setFinishing(true);
@@ -449,7 +430,7 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
 
   function showNextPages() {
     if (bookPage === lastBookPage) {
-      void finishLearning();
+      if (!inventoryExhausted && !refining) void loadMoreActivities();
       return;
     }
     setBookPage((currentPage) => nextBookPage(currentPage, lastBookPage));
@@ -488,27 +469,31 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
             >
               Previous
             </button>
-            {bookPage === lastBookPage && canRefine ? (
-              <button
-                className={journalStyles.pageButton}
-                disabled={finishing || refining}
-                onClick={() => void refinePreferences()}
-                type="button"
-              >
-                {refining ? "Refining…" : "Refine my preferences"}
-              </button>
-            ) : null}
             <button
               className={journalStyles.pageButton}
-              disabled={finishing || refining}
+              disabled={
+                finishing ||
+                refining ||
+                (bookPage === lastBookPage && inventoryExhausted)
+              }
               onClick={showNextPages}
               type="button"
             >
               {bookPage === lastBookPage
-                ? finishing
-                  ? "Creating…"
-                  : "Create journal"
+                ? refining
+                  ? "Loading more…"
+                  : inventoryExhausted
+                    ? "All activities shown"
+                    : "More activities"
                 : "Next"}
+            </button>
+            <button
+              className={journalStyles.pageButton}
+              disabled={finishing || Boolean(submittingEntryId)}
+              onClick={() => void finishLearning()}
+              type="button"
+            >
+              {finishing ? "Creating…" : "Create journal"}
             </button>
           </div>
         </div>

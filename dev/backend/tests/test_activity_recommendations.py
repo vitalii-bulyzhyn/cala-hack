@@ -136,7 +136,7 @@ async def test_invalid_llm_initial_selection_falls_back_locally() -> None:
 
 
 @pytest.mark.asyncio
-async def test_adaptive_page_selects_top_unseen_items_then_stops() -> None:
+async def test_adaptive_pages_continue_selecting_unseen_items() -> None:
     algorithm = ActivityRecommendationAlgorithm(load_city_journal_inventories())
     pages = await algorithm.get_initial_pairs("Barcelona", ("art",))
     initial = tuple(activity for page in pages for activity in page.activities)
@@ -146,6 +146,7 @@ async def test_adaptive_page_selects_top_unseen_items_then_stops() -> None:
     adaptive = await algorithm.get_next_page(
         "Barcelona",
         ("art",),
+        initial,
         selected,
         rejected,
         PreferenceAlgorithmState.priors(),
@@ -158,16 +159,42 @@ async def test_adaptive_page_selects_top_unseen_items_then_stops() -> None:
     }
 
     final_selected = (*selected, adaptive.activities[0])
-    assert (
-        await algorithm.get_next_page(
-            "Barcelona",
-            ("art",),
-            final_selected,
-            rejected,
-            PreferenceAlgorithmState.priors(),
-        )
-        is None
+    following = await algorithm.get_next_page(
+        "Barcelona",
+        ("art",),
+        (*initial, *adaptive.activities),
+        final_selected,
+        rejected,
+        PreferenceAlgorithmState.priors(),
     )
+    assert following is not None
+    assert not {activity.name for activity in following.activities} & {
+        activity.name for activity in (*initial, *adaptive.activities)
+    }
+
+
+@pytest.mark.asyncio
+async def test_adaptive_page_uses_thompson_priors_without_any_ratings() -> None:
+    algorithm = ActivityRecommendationAlgorithm(
+        load_city_journal_inventories(),
+        random_source=PredictableRandom({}, 0.5),
+    )
+    pages = await algorithm.get_initial_pairs("Barcelona", ("art",))
+    initial = tuple(activity for page in pages for activity in page.activities)
+
+    adaptive = await algorithm.get_next_page(
+        "Barcelona",
+        ("art",),
+        initial,
+        (),
+        (),
+        PreferenceAlgorithmState.priors(),
+    )
+
+    assert adaptive is not None
+    assert len(adaptive.activities) == 1
+    assert adaptive.activities[0].category == "food"
+    assert adaptive.activities[0].name not in {activity.name for activity in initial}
 
 
 @pytest.mark.asyncio
@@ -216,7 +243,9 @@ async def test_llm_ranking_receives_choices_and_controls_the_adaptive_pick() -> 
     )
 
     state = PreferenceAlgorithmState.priors()
-    adaptive = await algorithm.get_next_page("Barcelona", ("art",), selected, rejected, state)
+    adaptive = await algorithm.get_next_page(
+        "Barcelona", ("art",), initial, selected, rejected, state
+    )
 
     assert adaptive is not None
     assert len(responses.calls) == 1

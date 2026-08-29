@@ -136,9 +136,9 @@ class FakeAlgorithm:
         return await self.initial(city, tags)
 
     async def get_next_page(  # type: ignore[no-untyped-def]
-        self, city, tags, selected, rejected, algorithm_state
+        self, city, tags, issued, selected, rejected, algorithm_state
     ):
-        return await self.next(city, tags, selected, rejected, algorithm_state)
+        return await self.next(city, tags, issued, selected, rejected, algorithm_state)
 
 
 class RecordingQueue:
@@ -205,11 +205,17 @@ async def test_default_blank_algorithm_reports_an_explicit_unconfigured_error() 
 
 
 @pytest.mark.asyncio
-async def test_existing_unanswered_page_is_replayed_without_algorithm_call() -> None:
+async def test_unanswered_initial_pages_can_add_adaptive_page_from_priors() -> None:
     itinerary_id = uuid4()
-    current = page(itinerary_id, 2, 3, 4)
+    initial = (
+        page(itinerary_id, 1, 1, 2),
+        page(itinerary_id, 2, 3, 4),
+        page(itinerary_id, 3, 5, 6),
+    )
+    adaptive = page(itinerary_id, 4, 7)
     repository = SimpleNamespace(
-        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, (current,)))
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, initial)),
+        add_adaptive_page=AsyncMock(return_value=adaptive),
     )
     algorithm = FakeAlgorithm()
     service = PreferenceLearningService(
@@ -219,9 +225,15 @@ async def test_existing_unanswered_page_is_replayed_without_algorithm_call() -> 
         generation_max_attempts=3,
     )
 
-    assert await service.get_next_page(itinerary_id) is current
+    assert await service.get_next_page(itinerary_id) is adaptive
     algorithm.initial.assert_not_awaited()
-    algorithm.next.assert_not_awaited()
+    city, tags, issued, selected, rejected, state = algorithm.next.await_args.args
+    assert city == "Barcelona"
+    assert tags == ("art", "food")
+    assert [entry.name for entry in issued] == [f"Activity {number}" for number in range(1, 7)]
+    assert selected == ()
+    assert rejected == ()
+    assert state == PreferenceAlgorithmState.priors()
 
 
 @pytest.mark.asyncio
@@ -323,9 +335,10 @@ async def test_after_answered_pages_algorithm_can_add_single_adaptive_page() -> 
     result = await service.get_next_page(itinerary_id)
 
     assert result is adaptive
-    city, tags, selected, rejected, state = algorithm.next.await_args.args
+    city, tags, issued, selected, rejected, state = algorithm.next.await_args.args
     assert city == "Barcelona"
     assert tags == ("art", "food")
+    assert [entry.name for entry in issued] == [f"Activity {number}" for number in range(1, 7)]
     assert [entry.name for entry in selected] == ["Activity 1", "Activity 3", "Activity 5"]
     assert [entry.name for entry in rejected] == ["Activity 2", "Activity 4", "Activity 6"]
     assert state == PreferenceAlgorithmState.priors()
@@ -447,7 +460,7 @@ async def test_omitted_and_null_page_items_remove_existing_responses() -> None:
 
 
 @pytest.mark.asyncio
-async def test_persisted_adaptive_page_makes_subsequent_progression_return_204() -> None:
+async def test_persisted_adaptive_page_allows_another_adaptive_selection() -> None:
     itinerary_id = uuid4()
     issued = (
         page(
@@ -473,8 +486,10 @@ async def test_persisted_adaptive_page_makes_subsequent_progression_return_204()
         ),
         page(itinerary_id, 4, 7),
     )
+    following = page(itinerary_id, 5, 8)
     repository = SimpleNamespace(
-        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, issued))
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, issued)),
+        add_adaptive_page=AsyncMock(return_value=following),
     )
     algorithm = FakeAlgorithm()
     service = PreferenceLearningService(
@@ -484,8 +499,8 @@ async def test_persisted_adaptive_page_makes_subsequent_progression_return_204()
         generation_max_attempts=3,
     )
 
-    assert await service.get_next_page(itinerary_id) is None
-    algorithm.next.assert_not_awaited()
+    assert await service.get_next_page(itinerary_id) is following
+    algorithm.next.assert_awaited_once()
 
 
 def test_missing_algorithm_state_means_untouched_priors_and_invalid_state_is_rejected() -> None:

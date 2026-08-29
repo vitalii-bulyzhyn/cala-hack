@@ -57,6 +57,7 @@ class PreferenceLearningAlgorithm(Protocol):
         self,
         city: str,
         tags: tuple[str, ...],
+        issued_activities: tuple[Activity, ...],
         selected_activities: tuple[Activity, ...],
         rejected_activities: tuple[Activity, ...],
         algorithm_state: PreferenceAlgorithmState,
@@ -80,11 +81,12 @@ class UnconfiguredPreferenceLearningAlgorithm:
         self,
         city: str,
         tags: tuple[str, ...],
+        issued_activities: tuple[Activity, ...],
         selected_activities: tuple[Activity, ...],
         rejected_activities: tuple[Activity, ...],
         algorithm_state: PreferenceAlgorithmState,
     ) -> PreferencePageSuggestion | None:
-        del city, tags, selected_activities, rejected_activities, algorithm_state
+        del city, tags, issued_activities, selected_activities, rejected_activities, algorithm_state
         raise PreferenceAlgorithmNotConfiguredError
 
 
@@ -110,13 +112,8 @@ class PreferenceLearningService:
         snapshot = await self._snapshot(itinerary_id)
         self._ensure_collecting(snapshot)
 
-        if any(page.source.value == "adaptive" for page in snapshot.pages):
-            return None
-        unanswered = _first_unanswered_page(snapshot)
-        if unanswered is not None:
-            return unanswered
-
         selected, rejected = _partition_activities(snapshot)
+        issued = _issued_activities(snapshot)
         try:
             if not snapshot.pages:
                 initial = await self._algorithm.get_initial_pairs(
@@ -133,6 +130,7 @@ class PreferenceLearningService:
             suggestion = await self._algorithm.get_next_page(
                 snapshot.city,
                 snapshot.tags,
+                issued,
                 selected,
                 rejected,
                 snapshot.algorithm_state,
@@ -230,13 +228,6 @@ class PreferenceLearningService:
             raise PreferenceLearningClosedError
 
 
-def _first_unanswered_page(snapshot: PreferenceLearningSnapshot) -> PreferencePage | None:
-    for page in snapshot.pages:
-        if any(entry.response is None for entry in page.entries):
-            return page
-    return None
-
-
 def _partition_activities(
     snapshot: PreferenceLearningSnapshot,
 ) -> tuple[tuple[Activity, ...], tuple[Activity, ...]]:
@@ -252,6 +243,10 @@ def _partition_activities(
             else:
                 rejected.append(activity)
     return tuple(selected), tuple(rejected)
+
+
+def _issued_activities(snapshot: PreferenceLearningSnapshot) -> tuple[Activity, ...]:
+    return tuple(_activity(entry) for page in snapshot.pages for entry in page.entries)
 
 
 def _activity(entry: PreferenceItem) -> Activity:
