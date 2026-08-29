@@ -29,7 +29,7 @@ from app.services.itineraries import ItineraryService
 router = APIRouter()
 
 
-def _resource_response(itinerary: Itinerary, *, public_base_url: str) -> ItineraryResponse:
+def _resource_response(itinerary: Itinerary) -> ItineraryResponse:
     places = []
     for stop in itinerary.stops:
         location = None
@@ -89,9 +89,6 @@ def _resource_response(itinerary: Itinerary, *, public_base_url: str) -> Itinera
             or not places
         )
         if result_is_complete:
-            image_url = hero.url  # type: ignore[union-attr]
-            if image_url.startswith("/"):
-                image_url = f"{public_base_url.rstrip('/')}{image_url}"
             result = ItineraryResultResponse(
                 destination=itinerary.destination,  # type: ignore[arg-type]
                 planned_date=itinerary.planned_date,
@@ -100,7 +97,7 @@ def _resource_response(itinerary: Itinerary, *, public_base_url: str) -> Itinera
                 summary=itinerary.summary,  # type: ignore[arg-type]
                 journal_image=JournalImageResponse(
                     id=hero.id,  # type: ignore[union-attr]
-                    url=image_url,
+                    url=hero.url,  # type: ignore[arg-type,union-attr]
                     content_type=hero.content_type,  # type: ignore[union-attr]
                     width=hero.width,  # type: ignore[union-attr]
                     height=hero.height,  # type: ignore[union-attr]
@@ -188,7 +185,7 @@ async def get_itinerary(
 ) -> ItineraryResponse:
     itinerary = await service.get(itinerary_id)
     response.headers["Cache-Control"] = "no-store"
-    resource = _resource_response(itinerary, public_base_url=str(request.base_url))
+    resource = _resource_response(itinerary)
     if (
         resource.status == PublicItineraryStatus.PENDING
         and resource.stage != PendingItineraryStage.LEARNING_PREFERENCES

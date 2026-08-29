@@ -20,11 +20,11 @@ Run `make worker-dev` separately. Configuration comes from the process environme
 - `GET /api/v1/health/live` — process liveness; calls no dependency.
 - `GET /api/v1/health/ready` — requires Postgres and reports Redis as optional/degraded.
 - `GET /api/v1/providers/status` — redacted configuration presence; no provider call.
-- `POST /api/v1/itineraries` — accepts `{"city":"Barcelona","tags":["art","local food"]}` and returns `202` plus the resource's current public status.
+- `POST /api/v1/itineraries` — accepts Barcelona, Toulouse, or Valencia with tags and returns `202` plus the resource's current public status.
 - `GET /api/v1/itineraries/{itinerary_id}` — returns `pending`, `done`, or `fail`, a stable pending stage or `null`, and mutually exclusive result/error data.
 - `GET /api/v1/itineraries/{itinerary_id}/preference-pages` — lists every issued page and its current decisions without advancing learning.
 - `GET /api/v1/itineraries/{itinerary_id}/preference-pages/next` — returns/replays the current single/pair page, creates the next algorithm page when required, or returns `204`.
-- `PUT /api/v1/itineraries/{itinerary_id}/preference-items/{item_id}/response` — upserts `{"decision":"like|dislike"}` for the exact issued item.
+- `PUT /api/v1/itineraries/{itinerary_id}/preference-pages/{page_id}/feedback` — atomically applies the page's `like|dislike|null` decisions and rebuilds durable bandit state.
 - `POST /api/v1/itineraries/{itinerary_id}/preference-learning/complete` — closes learning with zero or more recorded responses and creates/enqueues generation.
 - `GET /api/v1/openapi.json` — OpenAPI schema.
 - `GET /docs` — Swagger UI.
@@ -36,9 +36,9 @@ An optional `Idempotency-Key` accepts 1–128 letters, digits, `.`, `_`, `:`, or
 
 ## Preference-learning seam
 
-Creation atomically stores the itinerary and a collecting learning session in stage `learning_preferences`; it deliberately creates no generation run. `PreferenceLearningAlgorithm` defines `get_initial_pairs`, `get_next_page`, and `update_learning_algorithm`. The default `catalog-bandit-v1` implementation ranks a curated four-category catalog deterministically and may use OpenAI for adaptive reranking when configured; its fallback requires no key.
+Creation atomically stores the itinerary and a collecting learning session in stage `learning_preferences`; it deliberately creates no generation run. `PreferenceLearningAlgorithm` defines deterministic initial and state-aware adaptive selection. The default `city-journal-bandit-v1` implementation strictly loads the selected city's authoritative journal entries, may use OpenAI for adaptive reranking, and samples persisted category arms with Thompson Sampling; there is no generic-city fallback.
 
-The implemented persistence contract requires three initial pairs (six entries), allows later single/pair pages, and stores every entry's UUID, name, category, description, and HTTP(S) image link. Responses are itinerary/item-scoped upserts and become immutable at completion. Completion is allowed with unanswered items, creates deduplicated orchestration version 4, and passes only recorded likes/dislikes in the selected/rejected snapshots to the worker.
+The implemented persistence contract requires three initial pairs (six entries), allows one later single/pair page, and stores every entry's UUID, name, category, journal prose, optional media link, and private Cala entity metadata. Page feedback is atomic and idempotent, neutral removes evidence, and every edit reconstructs versioned state from durable responses. Completion is allowed with unanswered items and finalizes state plus deduplicated orchestration version 4 under the same learning lock.
 
 The full public representation, headers, examples, and invariants are in [`docs/architecture/api-contract.md`](../../docs/architecture/api-contract.md).
 
@@ -80,6 +80,8 @@ Compose mounts the same `generated_media` volume into API and worker. Host-local
 - `20260829_0002` migrates to natural-language requests, resolved destination/date/timezone, typed place-link JSON, plan checkpoint data, and one itinerary-level hero constraint.
 - `20260829_0003` replaces request text with separately stored `city` and JSONB `tags` fields.
 - `20260829_0004` adds the learning stage and durable sessions, pages, items, and responses; existing itineraries are backfilled as completed.
+- `20260829_0005` adds nullable JSONB versioned bandit state to learning sessions.
+- `20260829_0006` adopts the authoritative city journal categories, optional preference media, and private Cala entity metadata.
 
 API and worker never create or upgrade schema. Compose runs `alembic upgrade head` in a one-shot `migrate` service.
 

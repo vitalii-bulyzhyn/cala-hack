@@ -59,6 +59,16 @@ class PreferenceEngineInvalidOutputError(AppError):
         )
 
 
+class UnsupportedJournalCityError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="CITY_NOT_SUPPORTED",
+            message="Travel Journal currently supports Barcelona, Toulouse, and Valencia.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            retryable=False,
+        )
+
+
 class PreferenceLearningClosedError(AppError):
     def __init__(self) -> None:
         super().__init__(
@@ -73,6 +83,15 @@ class PreferenceItemNotFoundError(AppError):
         super().__init__(
             code="PREFERENCE_ITEM_NOT_FOUND",
             message="The requested preference item does not belong to this itinerary.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+
+class PreferencePageNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="PREFERENCE_PAGE_NOT_FOUND",
+            message="The requested preference page does not belong to this itinerary.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
 

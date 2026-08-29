@@ -16,6 +16,7 @@ dependencies = [
   "greenlet==3.5.5",
   "httpx==0.28.1",
   "openai==3.6.0",
+  "pillow==11.3.0",
   "pydantic==2.13.5",
   "pydantic-settings==2.15.0",
   "redis==8.1.0",
@@ -35,7 +36,7 @@ where = ["."]
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["data/*.json", "data/*.jpg"]
+app = ["data/*.jpg", "data/journal_entries/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"

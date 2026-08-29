@@ -138,6 +138,8 @@ class GenerationRunStore:
                     category=item.category,
                     description=item.description,
                     image_link=item.image_link,
+                    cala_entity_id=item.cala_entity_id,
+                    cala_entity_type=item.cala_entity_type,
                 )
                 if decision == PreferenceDecision.LIKE:
                     selected.append(activity)
@@ -339,6 +341,7 @@ class GenerationRunStore:
             for generated in completion.media_assets:
                 session.add(
                     MediaAsset(
+                        id=generated.id,
                         itinerary_id=run.itinerary_id,
                         stop_id=(
                             stop_ids[generated.stop_position]
@@ -438,6 +441,7 @@ class GenerationRunStore:
             previous_end = stop.end_time
         stop_positions = set(positions)
         for asset in completion.media_assets:
+            expected_url = f"/{asset.id}.png"
             if asset.stop_position is not None and asset.stop_position not in stop_positions:
                 raise InvalidGenerationCompletionError("media references an unknown stop")
             if asset.role == MediaRole.STOP_ILLUSTRATION and asset.stop_position is None:
@@ -461,6 +465,14 @@ class GenerationRunStore:
                 asset.url.startswith("/") or GenerationRunStore._is_public_http_url(asset.url)
             ):
                 raise InvalidGenerationCompletionError("ready media URL is invalid")
+            if asset.status == MediaStatus.READY and (
+                asset.url != expected_url
+                or asset.storage_key != f"{asset.id}.png"
+                or asset.content_type != "image/png"
+            ):
+                raise InvalidGenerationCompletionError(
+                    "ready media must use its immutable frontend PNG path"
+                )
             if asset.role == MediaRole.HERO and not asset.storage_key:
                 raise InvalidGenerationCompletionError("journal images require owned storage")
             if asset.status == MediaStatus.FAILED and (

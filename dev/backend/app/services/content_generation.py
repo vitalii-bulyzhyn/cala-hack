@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any, Protocol
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from app.domain.itineraries import ItineraryStatus, MediaRole, MediaStatus
 from app.domain.preferences import Activity
@@ -44,6 +44,7 @@ class GeneratedStop:
 
 @dataclass(frozen=True)
 class GeneratedMediaAsset:
+    id: UUID
     role: MediaRole
     status: MediaStatus
     stop_position: int | None = None
@@ -61,6 +62,12 @@ class GeneratedMediaAsset:
     prompt_version: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+
+
+def generated_image_id(run_id: UUID, role: MediaRole, stop_position: int | None = None) -> UUID:
+    """Return the stable public image ID for a logical image slot in one durable run."""
+    owner = "itinerary" if stop_position is None else f"stop:{stop_position}"
+    return uuid5(run_id, f"{role.value}:{owner}")
 
 
 @dataclass(frozen=True)

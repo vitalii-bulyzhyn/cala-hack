@@ -32,10 +32,10 @@ x-backend-environment: &backend-environment
   FAL_IMAGE_MODEL: ${FAL_IMAGE_MODEL:-fal-ai/flux/schnell}
   FAL_START_TIMEOUT_SECONDS: ${FAL_START_TIMEOUT_SECONDS:-30}
   FAL_RESULT_TIMEOUT_SECONDS: ${FAL_RESULT_TIMEOUT_SECONDS:-180}
-  MEDIA_STORAGE_PATH: /data/generated-media
-  MEDIA_URL_PATH: ${MEDIA_URL_PATH:-/media}
+  IMAGE_PUBLIC_PATH: /data/frontend-public
   MEDIA_DOWNLOAD_TIMEOUT_SECONDS: ${MEDIA_DOWNLOAD_TIMEOUT_SECONDS:-30}
   MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-15000000}
+  MEDIA_MAX_PIXELS: ${MEDIA_MAX_PIXELS:-20000000}
 
 services:
   postgres:
@@ -106,13 +106,6 @@ services:
       postgres:
         condition: service_healthy
 
-  media-init:
-    image: alpine:3.22
-    restart: "no"
-    command: ["sh", "-c", "chown -R 100:101 /data/generated-media"]
-    volumes:
-      - generated_media:/data/generated-media
-
   backend:
     build:
       context: ./dev/backend
@@ -124,11 +117,8 @@ services:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./dev/backend:/app
-      - generated_media:/data/generated-media
     depends_on:
       migrate:
-        condition: service_completed_successfully
-      media-init:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
@@ -151,11 +141,9 @@ services:
     command: ["python", "-m", "app.worker"]
     volumes:
       - ./dev/backend:/app
-      - generated_media:/data/generated-media
+      - ./dev/frontend/public:/data/frontend-public
     depends_on:
       migrate:
-        condition: service_completed_successfully
-      media-init:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
@@ -201,4 +189,3 @@ volumes:
   pgadmin_data:
   frontend_node_modules:
   frontend_next:
-  generated_media:

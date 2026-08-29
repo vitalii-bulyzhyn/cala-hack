@@ -1,13 +1,13 @@
-# Activity catalog
+# City journal inventories
 
-`activities.json` is the extendable inventory behind preference learning. Adding an activity does not require an API, database, or frontend change.
+`journal_entries/*.json` is the authoritative preference inventory. The application currently supports exactly Barcelona, Toulouse, and Valencia; there is no generic or cross-city fallback.
 
-Each entry requires:
+Each file must be named after its normalized `city` and contains:
 
-- a unique `name`;
-- one of `food`, `drinks_party`, `culture`, or `nature`;
-- a `description` containing `{city}`, which is filled from the itinerary;
-- a public HTTP(S) `image_link`;
-- short lowercase `signals` that can overlap with traveler tags and liked activity language.
+- the city and source model identifier;
+- unique entry names within that city;
+- nullable Cala `entity_id` and `entity_type` grounding metadata;
+- exactly one of `food`, `culture`, `outdoors`, or `neighbourhoods`;
+- the traveler-facing `journal_entry` prose.
 
-Keep at least two entries in every category. The local ranker uses `signals`; when OpenAI is configured, the model may reorder only the remaining known names inside their existing categories. Run `make check` after editing—the catalog contract and category coverage are validated by backend tests.
+Keep at least two entries in every category. Missing media is intentional: the journal renders authoritative prose on paper rather than substituting unrelated stock images. Cala metadata stays behind the backend boundary. Run `make check` after editing; inventory naming, schema, uniqueness, supported-city coverage, and category coverage are validated by tests.

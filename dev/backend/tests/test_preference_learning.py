@@ -15,6 +15,8 @@ from app.db.models import GenerationRun, PreferenceItem, PreferencePage, Prefere
 from app.domain.itineraries import ItineraryStatus
 from app.domain.preferences import (
     Activity,
+    BanditArm,
+    PreferenceAlgorithmState,
     PreferenceDecision,
     PreferenceLearningStatus,
     PreferencePageLayout,
@@ -24,6 +26,7 @@ from app.domain.preferences import (
 from app.main import create_app
 from app.repositories.preference_learning import (
     CompletedPreferenceLearning,
+    PreferenceAlgorithmStateInvalidError,
     PreferenceLearningRepository,
     PreferenceLearningSnapshot,
 )
@@ -47,8 +50,22 @@ def suggestion(*numbers: int) -> PreferencePageSuggestion:
     return PreferencePageSuggestion(tuple(activity(number) for number in numbers))
 
 
-def test_activity_contract_requires_display_copy_and_an_http_image_link() -> None:
+def test_activity_contract_allows_authoritative_text_without_placeholder_image() -> None:
     assert activity(1).image_link == "https://images.example/activity-1.jpg"
+    image_id = uuid4()
+    local_image = Activity(
+        name="Local image",
+        category="culture",
+        description="A local image entry.",
+        image_link=f"/{image_id}.png",
+    )
+    assert local_image.image_link == f"/{image_id}.png"
+    text_only = Activity(
+        name="Choice",
+        category="culture",
+        description="A journal entry.",
+    )
+    assert text_only.image_link is None
     with pytest.raises(ValueError):
         Activity(
             name="Choice",
@@ -114,16 +131,14 @@ class FakeAlgorithm:
             return_value=(suggestion(1, 2), suggestion(3, 4), suggestion(5, 6))
         )
         self.next = AsyncMock(return_value=suggestion(7))
-        self.update = AsyncMock(return_value=None)
 
     async def get_initial_pairs(self, city: str, tags: tuple[str, ...]):
         return await self.initial(city, tags)
 
-    async def get_next_page(self, city, tags, selected, rejected):  # type: ignore[no-untyped-def]
-        return await self.next(city, tags, selected, rejected)
-
-    async def update_learning_algorithm(self, selected, rejected):  # type: ignore[no-untyped-def]
-        return await self.update(selected, rejected)
+    async def get_next_page(  # type: ignore[no-untyped-def]
+        self, city, tags, issued, selected, rejected, algorithm_state
+    ):
+        return await self.next(city, tags, issued, selected, rejected, algorithm_state)
 
 
 class RecordingQueue:
@@ -145,6 +160,7 @@ def snapshot(
         city="Barcelona",
         tags=("art", "food"),
         status=status,
+        algorithm_state=PreferenceAlgorithmState.priors(),
         pages=pages,
     )
 
@@ -189,11 +205,17 @@ async def test_default_blank_algorithm_reports_an_explicit_unconfigured_error() 
 
 
 @pytest.mark.asyncio
-async def test_existing_unanswered_page_is_replayed_without_algorithm_call() -> None:
+async def test_unanswered_initial_pages_can_add_adaptive_page_from_priors() -> None:
     itinerary_id = uuid4()
-    current = page(itinerary_id, 2, 3, 4)
+    initial = (
+        page(itinerary_id, 1, 1, 2),
+        page(itinerary_id, 2, 3, 4),
+        page(itinerary_id, 3, 5, 6),
+    )
+    adaptive = page(itinerary_id, 4, 7)
     repository = SimpleNamespace(
-        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, (current,)))
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, initial)),
+        add_adaptive_page=AsyncMock(return_value=adaptive),
     )
     algorithm = FakeAlgorithm()
     service = PreferenceLearningService(
@@ -203,9 +225,15 @@ async def test_existing_unanswered_page_is_replayed_without_algorithm_call() -> 
         generation_max_attempts=3,
     )
 
-    assert await service.get_next_page(itinerary_id) is current
+    assert await service.get_next_page(itinerary_id) is adaptive
     algorithm.initial.assert_not_awaited()
-    algorithm.next.assert_not_awaited()
+    city, tags, issued, selected, rejected, state = algorithm.next.await_args.args
+    assert city == "Barcelona"
+    assert tags == ("art", "food")
+    assert [entry.name for entry in issued] == [f"Activity {number}" for number in range(1, 7)]
+    assert selected == ()
+    assert rejected == ()
+    assert state == PreferenceAlgorithmState.priors()
 
 
 @pytest.mark.asyncio
@@ -263,7 +291,6 @@ async def test_list_pages_returns_every_issued_page_without_advancing_learning()
     repository.get_snapshot.assert_awaited_once_with(itinerary_id)
     algorithm.initial.assert_not_awaited()
     algorithm.next.assert_not_awaited()
-    algorithm.update.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -308,15 +335,184 @@ async def test_after_answered_pages_algorithm_can_add_single_adaptive_page() -> 
     result = await service.get_next_page(itinerary_id)
 
     assert result is adaptive
-    city, tags, selected, rejected = algorithm.next.await_args.args
+    city, tags, issued, selected, rejected, state = algorithm.next.await_args.args
     assert city == "Barcelona"
     assert tags == ("art", "food")
+    assert [entry.name for entry in issued] == [f"Activity {number}" for number in range(1, 7)]
     assert [entry.name for entry in selected] == ["Activity 1", "Activity 3", "Activity 5"]
     assert [entry.name for entry in rejected] == ["Activity 2", "Activity 4", "Activity 6"]
+    assert state == PreferenceAlgorithmState.priors()
 
 
 @pytest.mark.asyncio
-async def test_completion_updates_algorithm_creates_run_and_notifies_worker() -> None:
+async def test_page_feedback_passes_full_state_to_one_atomic_repository_call() -> None:
+    itinerary_id = uuid4()
+    stored = page(itinerary_id, 1, 1, 2)
+    decisions = {
+        stored.entries[0].id: PreferenceDecision.LIKE,
+        stored.entries[1].id: None,
+    }
+    repository = SimpleNamespace(record_page_feedback=AsyncMock(return_value=stored))
+    service = PreferenceLearningService(
+        repository,  # type: ignore[arg-type]
+        FakeAlgorithm(),
+        RecordingQueue(),
+        generation_max_attempts=3,
+    )
+
+    assert await service.record_page_feedback(itinerary_id, stored.id, decisions) is stored
+    repository.record_page_feedback.assert_awaited_once_with(itinerary_id, stored.id, decisions)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        (PreferenceDecision.DISLIKE, PreferenceDecision.DISLIKE),
+        (PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        (PreferenceDecision.DISLIKE, PreferenceDecision.LIKE),
+        (PreferenceDecision.LIKE, PreferenceDecision.LIKE),
+        (None, None),
+        (PreferenceDecision.LIKE, None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_every_pair_outcome_and_neutral_state_is_accepted_atomically(first, second) -> None:  # type: ignore[no-untyped-def]
+    itinerary_id = uuid4()
+    stored = page(itinerary_id, 1, 1, 2)
+    decisions = {stored.entries[0].id: first, stored.entries[1].id: second}
+    repository = SimpleNamespace(record_page_feedback=AsyncMock(return_value=stored))
+    service = PreferenceLearningService(
+        repository,  # type: ignore[arg-type]
+        FakeAlgorithm(),
+        RecordingQueue(),
+        generation_max_attempts=3,
+    )
+
+    await service.record_page_feedback(itinerary_id, stored.id, decisions)
+
+    repository.record_page_feedback.assert_awaited_once_with(itinerary_id, stored.id, decisions)
+
+
+@pytest.mark.asyncio
+async def test_bandit_state_is_reconstructed_from_priors_without_double_counting() -> None:
+    itinerary_id = uuid4()
+    rows = [
+        (PreferencePageSource.INITIAL, "food", PreferenceDecision.LIKE),
+        (PreferencePageSource.INITIAL, "food", PreferenceDecision.DISLIKE),
+        (PreferencePageSource.ADAPTIVE, "culture", PreferenceDecision.DISLIKE),
+        (PreferencePageSource.ADAPTIVE, "outdoors", PreferenceDecision.LIKE),
+    ]
+    session = SimpleNamespace(execute=AsyncMock(return_value=rows))
+    repository = PreferenceLearningRepository(session)  # type: ignore[arg-type]
+
+    first = await repository._rebuild_algorithm_state(itinerary_id)
+    second = await repository._rebuild_algorithm_state(itinerary_id)
+
+    expected = PreferenceAlgorithmState(
+        arms={
+            "food": BanditArm(alpha=2, beta=1.25),
+            "culture": BanditArm(alpha=1, beta=1.5),
+            "outdoors": BanditArm(alpha=2, beta=1),
+            "neighbourhoods": BanditArm(alpha=1, beta=1),
+        }
+    )
+    assert first == expected
+    assert second == expected
+
+
+@pytest.mark.asyncio
+async def test_omitted_and_null_page_items_remove_existing_responses() -> None:
+    itinerary_id = uuid4()
+    stored = page(
+        itinerary_id,
+        1,
+        1,
+        2,
+        decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+    )
+    assert stored.entries[1].response is not None
+    learning = SimpleNamespace(
+        status=PreferenceLearningStatus.COLLECTING,
+        algorithm_state=None,
+    )
+    session = SimpleNamespace(
+        scalar=AsyncMock(return_value=stored),
+        flush=AsyncMock(),
+        commit=AsyncMock(),
+        rollback=AsyncMock(),
+    )
+    repository = PreferenceLearningRepository(session)  # type: ignore[arg-type]
+    repository._locked_learning = AsyncMock(return_value=learning)  # type: ignore[method-assign]
+    repository._rebuild_algorithm_state = AsyncMock(  # type: ignore[method-assign]
+        return_value=PreferenceAlgorithmState.priors()
+    )
+    repository._load_page = AsyncMock(return_value=stored)  # type: ignore[method-assign]
+
+    await repository.record_page_feedback(
+        itinerary_id,
+        stored.id,
+        {stored.entries[0].id: PreferenceDecision.LIKE},
+    )
+
+    assert stored.entries[1].response is None
+    assert learning.algorithm_state == PreferenceAlgorithmState.priors().model_dump(mode="json")
+    session.commit.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_persisted_adaptive_page_allows_another_adaptive_selection() -> None:
+    itinerary_id = uuid4()
+    issued = (
+        page(
+            itinerary_id,
+            1,
+            1,
+            2,
+            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        ),
+        page(
+            itinerary_id,
+            2,
+            3,
+            4,
+            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        ),
+        page(
+            itinerary_id,
+            3,
+            5,
+            6,
+            decisions=(PreferenceDecision.LIKE, PreferenceDecision.DISLIKE),
+        ),
+        page(itinerary_id, 4, 7),
+    )
+    following = page(itinerary_id, 5, 8)
+    repository = SimpleNamespace(
+        get_snapshot=AsyncMock(return_value=snapshot(itinerary_id, issued)),
+        add_adaptive_page=AsyncMock(return_value=following),
+    )
+    algorithm = FakeAlgorithm()
+    service = PreferenceLearningService(
+        repository,  # type: ignore[arg-type]
+        algorithm,
+        RecordingQueue(),
+        generation_max_attempts=3,
+    )
+
+    assert await service.get_next_page(itinerary_id) is following
+    algorithm.next.assert_awaited_once()
+
+
+def test_missing_algorithm_state_means_untouched_priors_and_invalid_state_is_rejected() -> None:
+    assert PreferenceLearningRepository._validated_state(None) == PreferenceAlgorithmState.priors()
+    with pytest.raises(PreferenceAlgorithmStateInvalidError):
+        PreferenceLearningRepository._validated_state(
+            {"schema_version": 1, "arms": {"food": {"alpha": 0, "beta": 1}}}
+        )
+
+
+@pytest.mark.asyncio
+async def test_completion_creates_run_and_notifies_worker() -> None:
     itinerary_id = uuid4()
     run_id = uuid4()
     answered = (
@@ -365,9 +561,6 @@ async def test_completion_updates_algorithm_creates_run_and_notifies_worker() ->
         algorithm_version="fake-v1",
         max_attempts=4,
     )
-    selected, rejected = algorithm.update.await_args.args
-    assert len(selected) == 4
-    assert len(rejected) == 3
 
 
 @pytest.mark.asyncio
@@ -401,7 +594,6 @@ async def test_completion_allows_all_issued_items_to_remain_unanswered() -> None
 
     assert completed.generation_run_id == run_id
     assert queue.run_ids == [run_id]
-    algorithm.update.assert_awaited_once_with((), ())
     repository.complete.assert_awaited_once_with(
         itinerary_id,
         algorithm_version="fake-v1",
@@ -450,9 +642,7 @@ async def test_completion_treats_unanswered_items_as_neutral() -> None:
 
     await service.complete(itinerary_id)
 
-    selected, rejected = algorithm.update.await_args.args
-    assert [entry.name for entry in selected] == ["Activity 1"]
-    assert [entry.name for entry in rejected] == ["Activity 4"]
+    repository.complete.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -462,6 +652,7 @@ async def test_repository_completion_has_no_response_or_adaptive_page_gate() -> 
     learning = SimpleNamespace(
         status=PreferenceLearningStatus.COLLECTING,
         algorithm_version=None,
+        algorithm_state=None,
         completed_at=None,
     )
     itinerary = SimpleNamespace(
@@ -471,6 +662,7 @@ async def test_repository_completion_has_no_response_or_adaptive_page_gate() -> 
     )
     session = SimpleNamespace(
         scalar=AsyncMock(side_effect=[itinerary, now]),
+        execute=AsyncMock(return_value=[]),
         add=Mock(),
         commit=AsyncMock(),
         rollback=AsyncMock(),
@@ -599,42 +791,30 @@ def test_preference_pages_api_returns_an_empty_list_before_issuance(
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_preference_decision_api_records_like_or_dislike(
+def test_preference_page_feedback_api_records_atomic_full_page_state(
     settings: Settings,
     healthy_checker: ReadinessChecker,
 ) -> None:
     itinerary_id = uuid4()
-    item_id = uuid4()
-    now = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
-    stored = PreferenceResponse(
-        id=uuid4(),
-        itinerary_id=itinerary_id,
-        item_id=item_id,
-        decision=PreferenceDecision.LIKE,
-        created_at=now,
-        updated_at=now,
+    stored = page(itinerary_id, 1, 1, 2)
+    first, second = stored.entries
+    first.response = PreferenceResponse(
+        id=uuid4(), itinerary_id=itinerary_id, item_id=first.id, decision=PreferenceDecision.LIKE
     )
-    service = SimpleNamespace(
-        record_response=AsyncMock(return_value=SimpleNamespace(response=stored))
-    )
+    service = SimpleNamespace(record_page_feedback=AsyncMock(return_value=stored))
 
     with preference_client(settings, healthy_checker, service) as client:
         response = client.put(
-            f"/api/v1/itineraries/{itinerary_id}/preference-items/{item_id}/response",
-            json={"decision": "like"},
+            f"/api/v1/itineraries/{itinerary_id}/preference-pages/{stored.id}/feedback",
+            json={"decisions": {str(first.id): "like", str(second.id): None}},
         )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "itinerary_id": str(itinerary_id),
-        "item_id": str(item_id),
-        "decision": "like",
-        "recorded_at": "2026-08-29T12:00:00Z",
-    }
-    service.record_response.assert_awaited_once_with(
+    assert [entry["decision"] for entry in response.json()["entries"]] == ["like", None]
+    service.record_page_feedback.assert_awaited_once_with(
         itinerary_id,
-        item_id,
-        PreferenceDecision.LIKE,
+        stored.id,
+        {first.id: PreferenceDecision.LIKE, second.id: None},
     )
 
 
@@ -684,14 +864,15 @@ def test_invalid_preference_decision_is_rejected_before_service(
     healthy_checker: ReadinessChecker,
 ) -> None:
     itinerary_id = uuid4()
+    page_id = uuid4()
     item_id = uuid4()
-    service = SimpleNamespace(record_response=AsyncMock())
+    service = SimpleNamespace(record_page_feedback=AsyncMock())
 
     with preference_client(settings, healthy_checker, service) as client:
         response = client.put(
-            f"/api/v1/itineraries/{itinerary_id}/preference-items/{item_id}/response",
-            json={"decision": "maybe"},
+            f"/api/v1/itineraries/{itinerary_id}/preference-pages/{page_id}/feedback",
+            json={"decisions": {str(item_id): "maybe"}},
         )
 
     assert response.status_code == 422
-    service.record_response.assert_not_awaited()
+    service.record_page_feedback.assert_not_awaited()

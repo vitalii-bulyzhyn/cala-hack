@@ -57,7 +57,7 @@ assert replayed["status_url"] == accepted["status_url"]
 assert replayed["status"] in {"pending", "done", "fail"}
 assert replay_headers["idempotency-replayed"] == "true"
 
-conflict_status, conflict, _ = request_json(create_request("Madrid", tags))
+conflict_status, conflict, _ = request_json(create_request("Valencia", tags))
 assert conflict_status == 409, conflict
 assert conflict["error"]["code"] == "IDEMPOTENCY_KEY_REUSED", conflict
 
@@ -79,6 +79,7 @@ for page_position in range(1, 4):
     assert page["position"] == page_position, page
     assert page["layout"] == "pair", page
     assert len(page["entries"]) == 2, page
+    decisions = {}
     for index, entry in enumerate(page["entries"]):
         assert set(entry) == {
             "id",
@@ -89,14 +90,15 @@ for page_position in range(1, 4):
             "decision",
         }
         assert entry["decision"] is None
-        response_request = urllib.request.Request(
-            f"{API_ROOT}/itineraries/{accepted['id']}/preference-items/{entry['id']}/response",
-            data=json.dumps({"decision": "like" if index == 0 else "dislike"}).encode(),
-            headers={"Content-Type": "application/json"},
-            method="PUT",
-        )
-        response_status, recorded, _ = request_json(response_request)
-        assert response_status == 200, recorded
+        decisions[entry["id"]] = "like" if index == 0 else "dislike"
+    feedback_request = urllib.request.Request(
+        f"{API_ROOT}/itineraries/{accepted['id']}/preference-pages/{page['id']}/feedback",
+        data=json.dumps({"decisions": decisions}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    feedback_status, recorded, _ = request_json(feedback_request)
+    assert feedback_status == 200, recorded
 
 adaptive_status, adaptive_page, _ = request_json(next_page_request)
 assert adaptive_status == 200, adaptive_page
@@ -104,15 +106,18 @@ assert adaptive_page["position"] == 4, adaptive_page
 assert adaptive_page["source"] == "adaptive", adaptive_page
 assert adaptive_page["layout"] in {"single", "pair"}, adaptive_page
 assert len(adaptive_page["entries"]) in {1, 2}, adaptive_page
-for index, entry in enumerate(adaptive_page["entries"]):
-    response_request = urllib.request.Request(
-        f"{API_ROOT}/itineraries/{accepted['id']}/preference-items/{entry['id']}/response",
-        data=json.dumps({"decision": "like" if index == 0 else "dislike"}).encode(),
-        headers={"Content-Type": "application/json"},
-        method="PUT",
-    )
-    response_status, recorded, _ = request_json(response_request)
-    assert response_status == 200, recorded
+adaptive_decisions = {
+    entry["id"]: "like" if index == 0 else "dislike"
+    for index, entry in enumerate(adaptive_page["entries"])
+}
+adaptive_feedback_request = urllib.request.Request(
+    f"{API_ROOT}/itineraries/{accepted['id']}/preference-pages/{adaptive_page['id']}/feedback",
+    data=json.dumps({"decisions": adaptive_decisions}).encode(),
+    headers={"Content-Type": "application/json"},
+    method="PUT",
+)
+adaptive_feedback_status, recorded, _ = request_json(adaptive_feedback_request)
+assert adaptive_feedback_status == 200, recorded
 
 no_more_status, no_more_page, _ = request_json(next_page_request)
 assert no_more_status == 204, no_more_page

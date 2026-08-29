@@ -21,11 +21,11 @@ Example input:
 
 ## Current core flow
 
-1. The user submits a city and zero to twenty preference tags.
+1. The user chooses Barcelona, Toulouse, or Valencia and submits zero to twenty preference tags.
 2. The API persists a durable resource in `learning_preferences` and returns its ID.
 3. The frontend requests the next preference page. The first algorithm call supplies three pairs (six activities); later pages may show one activity across a spread or a pair, one per page.
-4. Every issued activity is stored with image link, name, category, and description. Each like/dislike response is stored against the itinerary and exact item.
-5. From the final preference face, the user can complete with zero, partial, or complete responses. Completion updates the learning algorithm with recorded votes only and then creates the worker run; an adaptive page remains optional for clients that request one.
+4. Every issued activity is stored with name, category, journal prose, optional media, and private grounding metadata. Full-page feedback atomically updates exact-item responses and reconstructs durable bandit state.
+5. The UI automatically requests one Thompson-selected adaptive page after issuing the initial six, using prior arms if the traveler has not rated anything. From the final preference face, the user can complete with zero, partial, or complete responses. Completion finalizes state and creates the worker run under one session lock.
 6. The worker uses city, tags, selected activities, and rejected activities while researching/planning, then checkpoints and illustrates the journal as before.
 7. The user receives either `done` with one journal image and linked places, or `fail` with a safe error.
 
@@ -47,7 +47,7 @@ The planned day is seven days after the immutable UTC date on which the resource
 
 ### Learn before generating
 
-Generation never starts at initial submission. Stable issued-item IDs make reload/retry show the same choice, while explicit completion may proceed with no votes: recorded likes/dislikes shape generation and unanswered entries remain neutral. The default algorithm covers food, drinks/party, culture, and nature from an extendable catalog; it ranks locally and can use OpenAI only to rerank unseen adaptive choices.
+Generation never starts at initial submission. Stable issued-item IDs make reload/retry show the same choice, while explicit completion may proceed with no votes: recorded likes/dislikes shape generation and unanswered entries remain neutral. The default algorithm strictly uses the selected city's food, culture, outdoors, and neighbourhoods journal entries; it ranks locally, can use OpenAI only to rerank unseen adaptive choices, and uses persisted Thompson-sampling arms to choose adaptive categories.
 
 ### Honest terminal outcomes
 
@@ -59,7 +59,7 @@ Public status stays `pending`, `done`, or `fail`; a pending `stage` gives useful
 
 ## Success signals
 
-- Valid city/tag input creates a durable learning session; a configured algorithm can issue six initial options and record every response.
+- A supported city/tag input creates a durable learning session; the algorithm can issue six initial options and record every response.
 - Completing learning creates exactly one generation run that receives the selected/rejected activity snapshot.
 - The result has a resolved destination, planned date, IANA timezone, title, summary, three to five non-overlapping places, one map link per place, and exactly one app-owned hero image.
 - Every verified link is grounded in Cala output, and no unsupported live claim is presented as fact.

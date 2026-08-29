@@ -4,16 +4,13 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useRef, useState } from "react";
 
 import styles from "@/app/journey-flow.module.css";
-import {
-  MAX_DESTINATION_LENGTH,
-  parseDestination,
-} from "@/lib/destination";
+import { parseDestination, SUPPORTED_DESTINATIONS } from "@/lib/destination";
 import { PREFERENCE_GROUPS } from "@/lib/preferences";
 import { createItinerary } from "@/lib/api-client";
 
 export function DestinationForm() {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLSelectElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +59,11 @@ export function DestinationForm() {
         <label className={styles.fieldLabel} htmlFor="destination">
           Location
         </label>
-        <input
+        <select
           aria-describedby={error ? "destination-error" : undefined}
           aria-invalid={error ? true : undefined}
-          autoComplete="address-level2"
           className={styles.queryInput}
           id="destination"
-          maxLength={MAX_DESTINATION_LENGTH}
           name="destination"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -77,12 +72,17 @@ export function DestinationForm() {
               setError(null);
             }
           }}
-          placeholder="Enter a city or place"
           ref={inputRef}
           required
-          type="text"
           value={query}
-        />
+        >
+          <option value="">Choose a city</option>
+          {SUPPORTED_DESTINATIONS.map((destination) => (
+            <option key={destination} value={destination}>
+              {destination}
+            </option>
+          ))}
+        </select>
         {error ? (
           <p className={styles.formError} id="destination-error" role="alert">
             {error}

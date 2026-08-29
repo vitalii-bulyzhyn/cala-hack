@@ -1,19 +1,18 @@
-import asyncio
-import os
-import shutil
 from datetime import time, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
-from uuid import uuid4
 
 from app.domain.itineraries import ItineraryStatus, MediaRole, MediaStatus
 from app.domain.preferences import Activity
+from app.integrations.media_storage import LocalMediaStore, MediaStorageError
 from app.services.content_generation import (
     GeneratedMediaAsset,
     GeneratedStop,
     GenerationCheckpoint,
     GenerationCompletion,
     GenerationTask,
+    ContentGenerationFailure,
+    generated_image_id,
 )
 
 DEMO_ASSET_PATH = Path(__file__).resolve().parents[1] / "data" / "demo-journal-page.jpg"
@@ -31,12 +30,14 @@ class DemoContentGenerationPipeline:
     def __init__(
         self,
         *,
-        media_root: Path,
-        media_url_path: str,
+        image_public_path: Path,
+        max_bytes: int = 15_000_000,
+        max_pixels: int = 20_000_000,
         asset_path: Path = DEMO_ASSET_PATH,
     ) -> None:
-        self._media_root = media_root.resolve()
-        self._media_url_path = media_url_path.rstrip("/")
+        self._image_public_path = image_public_path.resolve()
+        self._max_bytes = max_bytes
+        self._max_pixels = max_pixels
         self._asset_path = asset_path.resolve()
 
     async def generate(
@@ -45,11 +46,24 @@ class DemoContentGenerationPipeline:
         checkpoint: GenerationCheckpoint,
     ) -> GenerationCompletion:
         del checkpoint
-        storage_key = f"{task.itinerary_id}/journal.jpg"
-        destination = (self._media_root / storage_key).resolve()
-        if not destination.is_relative_to(self._media_root):
-            raise ValueError("demo journal storage path escaped the configured media root")
-        await asyncio.to_thread(self._copy_asset, destination)
+        image_id = generated_image_id(task.run_id, MediaRole.HERO)
+        try:
+            async with LocalMediaStore(
+                root=self._image_public_path,
+                timeout_seconds=30,
+                max_bytes=self._max_bytes,
+                max_pixels=self._max_pixels,
+            ) as media_store:
+                stored = await media_store.copy_from_local(
+                    source_path=self._asset_path,
+                    image_id=image_id,
+                )
+        except MediaStorageError as exc:
+            raise ContentGenerationFailure(
+                code=exc.code,
+                message=exc.message,
+                retryable=exc.retryable,
+            ) from exc
 
         activities = self._demo_activities(task)
         stops = tuple(
@@ -94,33 +108,23 @@ class DemoContentGenerationPipeline:
             stops=stops,
             media_assets=(
                 GeneratedMediaAsset(
+                    id=image_id,
                     role=MediaRole.HERO,
                     status=MediaStatus.READY,
                     provider="local-demo",
                     provider_request_id=f"demo-{task.run_id.hex}",
                     attempt_count=task.attempt_count,
-                    url=f"{self._media_url_path}/{storage_key}",
-                    storage_key=storage_key,
-                    content_type="image/jpeg",
-                    width=576,
-                    height=1024,
+                    url=stored.public_url,
+                    storage_key=stored.storage_key,
+                    content_type=stored.content_type,
+                    width=stored.width,
+                    height=stored.height,
                     alt_text=f"Textured paper page for an offline demo journal about {task.city}.",
                     model_id="deterministic-demo-v1",
                     prompt_version="offline-demo-v1",
                 ),
             ),
         )
-
-    def _copy_asset(self, destination: Path) -> None:
-        if not self._asset_path.is_file():
-            raise ValueError("the bundled demo journal asset is missing")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
-        try:
-            shutil.copyfile(self._asset_path, temporary)
-            os.replace(temporary, destination)
-        finally:
-            temporary.unlink(missing_ok=True)
 
     @staticmethod
     def _demo_activities(task: GenerationTask) -> tuple[Activity, ...]:

@@ -16,9 +16,9 @@ export type ItineraryAccepted = {
 export type PreferenceEntry = {
   id: string;
   name: string;
-  category: "food" | "drinks_party" | "culture" | "nature";
+  category: "food" | "culture" | "outdoors" | "neighbourhoods";
   description: string;
-  image_link: string;
+  image_link: string | null;
   decision: "like" | "dislike" | null;
 };
 
@@ -29,6 +29,8 @@ export type PreferencePage = {
   source: "initial" | "adaptive";
   entries: PreferenceEntry[];
 };
+
+export type PreferenceDecision = "like" | "dislike" | null;
 
 export type PlaceLink = {
   kind: "map" | "official" | "source";

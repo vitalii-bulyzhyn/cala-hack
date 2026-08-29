@@ -24,11 +24,11 @@ When any OpenAI, Cala, or fal credential is absent and `OFFLINE_DEMO_ENABLED=tru
 
 ## Preference activity ranking
 
-`catalog-bandit-v1` loads `app/data/activities.json`, currently covering food, drinks/party, culture, and nature with at least four entries per category. City/tags deterministically rank the catalog and the first call selects six unique activities across all categories as three pairs.
+`city-journal-bandit-v1` loads the exact selected-city file below `app/data/journal_entries/`, currently covering Barcelona, Toulouse, and Valencia across food, culture, outdoors, and neighbourhoods. City/tags deterministically rank that inventory and the first call selects six unique entries across all categories as three pairs. No generic inventory or unsupported-city fallback exists.
 
-After six answers, category like/dislike scores choose one or two categories for one adaptive page. With `OPENAI_API_KEY`, the Responses API may rerank only the supplied unseen activity names inside their existing categories using a strict application-owned schema. It may not rename, invent, omit, duplicate, or recategorize candidates. Any missing key, provider failure, or invalid ranking falls back to the deterministic local order. After the adaptive page is answered, the current algorithm returns no further page.
+After the six initial activities are issued, Thompson Sampling reads the versioned four-category alpha/beta arms reconstructed from whatever durable feedback exists. With no ratings, all arms retain their `alpha=1,beta=1` priors, so selection still proceeds. It ignores exhausted categories and chooses one category or two with probability `0.35` for the only adaptive page. Every already-issued activity is excluded whether rated or neutral. With `OPENAI_API_KEY`, the Responses API may rerank only the supplied unseen activity names inside their existing categories using a strict application-owned schema. It may not rename, invent, omit, duplicate, or recategorize candidates. Any missing key, provider failure, or invalid ranking falls back to the deterministic local order. Once the adaptive page is persisted, progression returns no further page.
 
-Catalog image links are validated display URLs and are returned to the frontend; this backend does not download or proxy them. They are distinct from the generated journal image and its app-owned media-copy guarantees.
+The current city entries intentionally contain no display-media link. The frontend renders their authoritative journal prose directly on paper instead of substituting stock imagery. Nullable Cala entity IDs/types are persisted privately for grounding and never define the public API.
 
 ## OpenAI intent and planning
 
