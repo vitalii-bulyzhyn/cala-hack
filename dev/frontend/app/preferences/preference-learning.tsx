@@ -51,7 +51,9 @@ function PreferenceFace({ entry, pageNumber }: PreferenceFaceProps) {
   return (
     <article
       aria-label={`Preference journal page ${pageNumber}: ${entry.name}`}
-      className={styles.preferenceJournalFace}
+      className={`${styles.preferenceJournalFace} ${
+        entry.image_link ? styles.preferenceJournalFaceWithPhoto : ""
+      }`}
       style={{ backgroundImage: `url(${background})` }}
     >
       {entry.image_link ? (
@@ -345,12 +347,37 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
         page.id,
         decisions,
       );
-      setPages((current) =>
-        current.map((candidate) =>
-          candidate.id === updated.id ? updated : candidate,
-        ),
+      const updatedPages = pages.map((candidate) =>
+        candidate.id === updated.id ? updated : candidate,
       );
-      if (nextDecision !== null) {
+      setPages(updatedPages);
+
+      const updatedEntries = flattenEntries(updatedPages);
+      const updatedInitialEntries = updatedEntries.filter(
+        (candidate) => candidate.source === "initial",
+      );
+      const shouldFetchAdaptivePage =
+        updatedInitialEntries.length > 0 &&
+        updatedInitialEntries.every((candidate) => candidate.decision !== null) &&
+        !updatedEntries.some((candidate) => candidate.source === "adaptive");
+      let openedAdaptivePage = false;
+
+      if (shouldFetchAdaptivePage) {
+        setRefining(true);
+        try {
+          openedAdaptivePage = await issueAdaptivePage();
+        } catch (caught) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load the refined activities.",
+          );
+        } finally {
+          setRefining(false);
+        }
+      }
+
+      if (nextDecision !== null && !openedAdaptivePage) {
         setBookPage((currentPage) =>
           currentPage < lastBookPage
             ? nextBookPage(currentPage, lastBookPage)
@@ -373,22 +400,27 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     }
   }
 
+  async function issueAdaptivePage(): Promise<boolean> {
+    const adaptive = await getNextPreferencePage(itineraryId);
+    const issued = await refreshIssuedPages();
+    if (!adaptive) return false;
+
+    const nextEntries = flattenEntries(issued);
+    const firstAdaptiveEntry = nextEntries.findIndex(
+      (entry) => entry.source === "adaptive",
+    );
+    if (firstAdaptiveEntry === -1) return false;
+
+    setBookPage(bookPageForEntryIndex(firstAdaptiveEntry));
+    return true;
+  }
+
   async function refinePreferences() {
     if (refining || !canRefine) return;
     setRefining(true);
     setError(null);
     try {
-      const adaptive = await getNextPreferencePage(itineraryId);
-      const issued = await refreshIssuedPages();
-      if (adaptive) {
-        const nextEntries = flattenEntries(issued);
-        const firstAdaptiveEntry = nextEntries.findIndex(
-          (entry) => entry.source === "adaptive",
-        );
-        if (firstAdaptiveEntry !== -1) {
-          setBookPage(bookPageForEntryIndex(firstAdaptiveEntry));
-        }
-      }
+      await issueAdaptivePage();
     } catch (caught) {
       setError(
         caught instanceof Error

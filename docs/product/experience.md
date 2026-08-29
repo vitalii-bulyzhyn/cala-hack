@@ -18,12 +18,12 @@ The primary task is: choose a city and tags, react to visual activity options in
 
 - Use the itinerary ID to call `GET .../preference-pages/next` once to issue the three initial pairs, then `GET .../preference-pages` to load every persisted page.
 - Present the six initial activities as six faces in the same flipping journal used for the result. A returned `pair` supplies the left/right faces of one opening; a returned `single` occupies one centered face.
-- Every card/opening uses the returned name, category, journal prose, optional image link, and nullable saved decision. Text-only entries render as journal writing on paper; never invent replacement imagery. Do not infer identity from array position.
+- Every card/opening uses the returned name, category, full journal prose, optional image link, and nullable saved decision. Journal prose must remain fully visible; when space is constrained, shrink the associated image as far as necessary before compromising the writing. Text-only entries render as journal writing on paper; never invent replacement imagery. Do not infer identity from array position.
 - Submit the full opening with `PUT .../preference-pages/{page_id}/feedback`. Each issued item maps to `like`, `dislike`, or `null`; omitted/null items are neutral.
 - Keep like and dislike controls on every activity face, restore their pressed state from `decision`, and allow page turns whether or not the current face has a response. Repeating a selected control returns that item to neutral.
 - After a newly explicit like or dislike is saved, advance to the next journal opening when one remains. Returning a selected item to neutral stays on the current opening.
 - The integrated flow shows the three initial pairs as six faces and lets the traveler create the journal from the final face whether they answered all, some, or none. Unanswered activities are neutral.
-- After all issued initial items have explicit decisions, the integrated UI offers “Refine my preferences” to request the optional adaptive page. A `204` means there is no further page. Refinement is never required for completion.
+- After all six initial items have explicit decisions, the integrated UI automatically requests and opens the optional adaptive page. A `204` means there is no further page. If that automatic request fails, “Refine my preferences” remains available to retry; refinement is never required for completion.
 - The frontend calls completion when the traveler finishes the preference book; generation begins from its `202` response using only recorded likes/dislikes.
 - Initial suggestions work without provider keys. Adaptive OpenAI reranking falls back deterministically when unavailable.
 

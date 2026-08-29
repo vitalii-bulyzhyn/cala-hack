@@ -294,7 +294,7 @@
 }
 
 .preferenceJournalFace {
-  container-type: inline-size;
+  container-type: size;
   position: relative;
   width: 100%;
   height: 100%;
@@ -307,14 +307,20 @@
   isolation: isolate;
 }
 
+.preferenceJournalFaceWithPhoto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
 .preferencePhoto {
-  position: absolute;
-  top: 9cqw;
-  left: 10cqw;
-  width: 80cqw;
-  height: 48%;
-  margin: 0;
+  width: auto;
+  height: 100%;
+  max-height: 48cqh;
+  min-height: 0;
+  margin: 9cqw 10cqw 2.2cqw;
   padding: 2.2cqw;
+  align-self: end;
   overflow: hidden;
   border-radius: 1.5cqw;
   background: rgba(255, 253, 247, 0.96);
@@ -336,8 +342,14 @@
   left: 13cqw;
 }
 
+.preferenceJournalFaceWithPhoto .preferenceFaceCopy {
+  position: static;
+  margin: 0 12cqw 26cqw 13cqw;
+}
+
 .preferenceJournalTextFace {
   top: 14%;
+  bottom: 20%;
 }
 
 .preferenceJournalTextFace h2 {
@@ -352,7 +364,6 @@
   font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
   font-size: clamp(0.68rem, 3.8cqw, 1.04rem);
   line-height: 1.48;
-  -webkit-line-clamp: 11;
 }
 
 .preferenceFaceCopy .category {
@@ -371,15 +382,11 @@
 }
 
 .preferenceFaceCopy > p:last-child {
-  display: -webkit-box;
   max-width: 31ch;
   margin: 0;
-  overflow: hidden;
   color: var(--muted-ink);
-  font-size: clamp(0.52rem, 3.15cqw, 0.88rem);
+  font-size: clamp(0.38rem, 3.15cqw, 0.88rem);
   line-height: 1.38;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
 }
 
 .preferenceFacePageNumber {
