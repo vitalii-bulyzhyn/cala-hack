@@ -74,6 +74,8 @@ There is no public partial state. If any required result field or the hero image
 ## Visual direction
 
 - Use the bundled inward-rounded paper image for every left journal page and the outward-rounded supplied paper image for every right journal page, including the active result spread.
+- Order each preference face as a handwritten activity title, a short readable explanation, and a bottom-anchored activity image. Treat the supplied image with an ink-wash, taped-sketch frame while keeping the source image and its alt text intact.
+- Use the self-hosted handwritten display face for journal titles and headings; keep descriptions, controls, schedules, and links in the readable text face.
 - Let the generated 4:3 journal image carry watercolor, ink, tactile paper, taped sketches, and playful route marks.
 - Keep surrounding controls and place details restrained, readable, and visually compatible with the artifact.
 - Use short place labels in the generated image; schedules, descriptions, and links belong in HTML.

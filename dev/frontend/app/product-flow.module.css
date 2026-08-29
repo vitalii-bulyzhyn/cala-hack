@@ -78,7 +78,8 @@
   max-width: 12ch;
   margin: 0 0 1rem;
   color: var(--ink);
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(2.6rem, 7vw, 5rem);
   font-weight: 500;
   letter-spacing: -0.045em;
@@ -197,7 +198,8 @@
 .activityCopy h2 {
   max-width: 15ch;
   margin-bottom: clamp(0.25rem, 0.8vh, 0.65rem);
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(1.55rem, 3vw, 2.65rem);
   font-weight: 500;
   letter-spacing: -0.035em;
@@ -284,7 +286,7 @@
   right: clamp(1.25rem, 3vw, 2.5rem);
   bottom: clamp(1.25rem, 2.5vh, 2rem);
   color: rgba(70, 58, 39, 0.48);
-  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print", cursive;
   font-size: clamp(1rem, 1.6vw, 1.35rem);
 }
 
@@ -307,60 +309,155 @@
   isolation: isolate;
 }
 
-.preferencePhoto {
+.preferenceFaceContent {
   position: absolute;
-  top: 9cqw;
-  left: 10cqw;
-  width: 80cqw;
-  height: 48%;
-  margin: 0;
-  padding: 2.2cqw;
-  overflow: hidden;
-  border-radius: 1.5cqw;
-  background: rgba(255, 253, 247, 0.96);
-  box-shadow: 1.2cqw 1.8cqw 3cqw rgba(61, 45, 28, 0.15);
-  transform: rotate(-0.6deg);
+  inset: 9cqw 10cqw 10cqw 13cqw;
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4.5cqw;
 }
 
-.preferencePhoto img {
+.preferenceFaceCopy {
+  min-width: 0;
+}
+
+.preferenceFaceCopy h2 {
+  position: relative;
+  max-width: 13ch;
+  margin: 0 0 3.2cqw;
+  color: var(--ink);
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
+  font-size: clamp(1.05rem, 8.8cqw, 2.45rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 0.94;
+}
+
+.preferenceFaceCopy h2::after {
+  display: block;
+  width: min(22cqw, 5.5rem);
+  height: 1.4cqw;
+  margin-top: 1.5cqw;
+  border-top: max(1px, 0.32cqw) solid rgba(182, 79, 60, 0.58);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(-1.5deg);
+}
+
+.preferenceFaceCopy > p {
+  display: -webkit-box;
+  max-width: 32ch;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-ink);
+  font-size: clamp(0.54rem, 3.3cqw, 0.9rem);
+  line-height: 1.42;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.preferenceIllustration {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 2.3cqw;
+  border: max(1px, 0.26cqw) solid rgba(70, 58, 39, 0.22);
+  border-radius: 1.4cqw 2.2cqw 1.2cqw 2.4cqw;
+  background: rgba(255, 253, 247, 0.96);
+  box-shadow: 1.2cqw 1.8cqw 3cqw rgba(61, 45, 28, 0.15);
+  isolation: isolate;
+}
+
+.preferenceIllustration::after {
+  position: absolute;
+  z-index: 2;
+  inset: 1.8cqw;
+  border: max(1px, 0.22cqw) solid rgba(70, 58, 39, 0.2);
+  border-radius: 1cqw 1.6cqw 0.8cqw 1.4cqw;
+  content: "";
+  pointer-events: none;
+  transform: rotate(0.28deg);
+}
+
+.preferenceLeftFace .preferenceIllustration {
+  transform: rotate(0.65deg);
+}
+
+.preferenceRightFace .preferenceIllustration {
+  transform: rotate(-0.65deg);
+}
+
+.preferenceTape {
+  position: absolute;
+  z-index: 4;
+  top: -3.1cqw;
+  left: 50%;
+  width: 27cqw;
+  height: 7cqw;
+  border: 1px solid rgba(112, 87, 50, 0.11);
+  background: rgba(218, 191, 138, 0.58);
+  box-shadow: 0 0.7cqw 1.3cqw rgba(61, 45, 28, 0.08);
+  opacity: 0.88;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(-1.6deg);
+}
+
+.preferenceImageFrame {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0.8cqw 1.3cqw 0.7cqw 1.1cqw;
+  background: var(--paper-deep);
+}
+
+.preferenceImageFrame::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(105deg, rgba(255, 250, 234, 0.16), transparent 42%),
+    repeating-linear-gradient(
+      8deg,
+      transparent 0 1.25cqw,
+      rgba(48, 42, 32, 0.035) 1.4cqw 1.52cqw
+    );
+  content: "";
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.preferenceImageFrame img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.76) sepia(0.12) contrast(0.93) brightness(1.03);
 }
 
-.preferenceFaceCopy {
+.preferenceIllustration figcaption {
   position: absolute;
-  top: 59%;
-  right: 12cqw;
-  left: 13cqw;
-}
-
-.preferenceFaceCopy .category {
-  margin-bottom: 2.2cqw;
-  font-size: clamp(0.42rem, 2.5cqw, 0.68rem);
-}
-
-.preferenceFaceCopy h2 {
-  max-width: 13ch;
-  margin: 0 0 2.2cqw;
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
-  font-size: clamp(1rem, 7.5cqw, 2.1rem);
-  font-weight: 500;
-  letter-spacing: -0.04em;
-  line-height: 0.94;
-}
-
-.preferenceFaceCopy > p:last-child {
-  display: -webkit-box;
-  max-width: 31ch;
-  margin: 0;
-  overflow: hidden;
-  color: var(--muted-ink);
-  font-size: clamp(0.52rem, 3.15cqw, 0.88rem);
-  line-height: 1.38;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  z-index: 3;
+  right: 3.6cqw;
+  bottom: 3.2cqw;
+  max-width: 72%;
+  padding: 0.9cqw 1.9cqw 0.7cqw;
+  border: 1px solid rgba(70, 58, 39, 0.15);
+  color: var(--accent-dark);
+  background: rgba(255, 250, 240, 0.9);
+  box-shadow: 0.45cqw 0.65cqw 0 rgba(70, 58, 39, 0.08);
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print", cursive;
+  font-size: clamp(0.5rem, 3cqw, 0.82rem);
+  font-weight: 650;
+  line-height: 1;
+  text-align: right;
+  transform: rotate(-1.4deg);
 }
 
 .preferenceFacePageNumber {
@@ -368,13 +465,14 @@
   right: 8cqw;
   bottom: 5.8cqw;
   color: rgba(70, 58, 39, 0.55);
-  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print", cursive;
   font-size: clamp(0.5rem, 3.2cqw, 0.9rem);
 }
 
 .preferenceBookRatingControls {
   position: absolute;
-  top: 83%;
+  z-index: 5;
+  bottom: 11cqw;
   left: 13cqw;
   display: flex;
   gap: clamp(0.3rem, 3cqw, 0.75rem);
@@ -384,7 +482,8 @@
 .preferenceBookLoading {
   margin: 0;
   color: var(--ink);
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(1.8rem, 5vw, 3.4rem);
 }
 
@@ -408,7 +507,7 @@
 }
 
 .loadingMessage {
-  font-family: "Bradley Hand", "Segoe Print", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print", cursive;
   font-size: 1.4rem;
 }
 
@@ -650,7 +749,8 @@
 
 .offlineJournalMark h2 {
   margin: 0 0 0.8rem;
-  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-family: var(--font-handwriting, "Bradley Hand"), "Segoe Print",
+    "Comic Sans MS", cursive;
   font-size: clamp(2rem, 5vw, 3.7rem);
   font-weight: 500;
 }

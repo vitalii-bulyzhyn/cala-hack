@@ -85,13 +85,14 @@ Unresolved: production object store/CDN, retention, deletion, ACLs, and public U
 Status: **Complete for the integrated local product**.
 
 - Build city/tag entry, single/pair visual preference pages, response/completion flow, and `pending`, `done`, `fail` states.
+- Present each preference face in title, explanation, then bottom illustration order with consistent handwritten display typography.
 - Honor `Retry-After`; never resubmit merely because polling failed.
 - Render destination/date/title/summary, responsive 4:3 hero, and accessible ordered place details/links.
 - Preserve all essential content outside the generated image.
 
 Exit: frontend types align with the current OpenAPI shapes, the production build passes, and the durable itinerary ID connects every screen without resubmission.
 
-Unresolved: automated browser-state coverage, final brand/typography, and deployment routing for `/media`.
+Unresolved: automated browser-state coverage, broader brand refinement, and deployment routing for `/media`.
 
 ## Milestone 8 — Reliability and demo hardening
 
