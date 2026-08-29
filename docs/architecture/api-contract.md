@@ -33,7 +33,7 @@ Idempotency-Key: optional-client-key
 Request validation:
 
 - Exactly `city` and `tags`; extra fields are rejected and both fields are required.
-- City uses Unicode NFKC normalization and whitespace collapse, contains at least one letter and no control character, and is 1–160 characters after cleaning.
+- City is canonical `Barcelona`, `Toulouse`, or `Valencia`; other values are rejected because no substitute inventory exists.
 - Tags is an array of zero to twenty strings. Each tag uses the same Unicode/control rules and is 1–50 characters.
 - Duplicate tags are removed case-insensitively while preserving the first spelling and position.
 
@@ -71,7 +71,7 @@ The new resource has internal stage `learning_preferences`. The frontend uses th
 
 ## Preference learning
 
-Preference learning is scoped to one itinerary. Its injected algorithm interface is implemented by `catalog-bandit-v1`: deterministic city/tag ranking over a curated catalog for the initial six, followed by an optional OpenAI rerank with deterministic fallback for an adaptive page. The unconfigured implementation remains available for explicit injection/tests and returns `503 PREFERENCE_ENGINE_NOT_CONFIGURED`.
+Preference learning is scoped to one itinerary. Its injected algorithm interface is implemented by `city-journal-bandit-v1`: deterministic ranking over the exact Barcelona, Toulouse, or Valencia journal inventory for the initial six, followed by optional OpenAI reranking with deterministic fallback and durable Thompson Sampling for one adaptive page. Unsupported cities have no substitute inventory. The unconfigured implementation remains available for explicit injection/tests and returns `503 PREFERENCE_ENGINE_NOT_CONFIGURED`.
 
 ### List issued pages
 
@@ -100,47 +100,43 @@ The first call asks the algorithm for exactly three initial pairs, persists all 
   "entries": [
     {
       "id": "0664f4fd-a1bf-4d06-8629-f93062d900a1",
-      "name": "Modernist architecture walk",
-      "category": "architecture",
-      "description": "Explore expressive facades and landmark interiors.",
-      "image_link": "https://images.example/modernism.jpg",
+      "name": "Basílica de la Sagrada Família",
+      "category": "culture",
+      "description": "I spent a quiet part of the morning inside the Basílica de la Sagrada Família...",
+      "image_link": null,
       "decision": null
     },
     {
       "id": "fe11b9d1-f562-41d2-92f9-d1c005b98877",
-      "name": "Market tasting",
+      "name": "Pa amb tomàquet",
       "category": "food",
-      "description": "Discover local produce and casual Catalan flavors.",
-      "image_link": "https://images.example/market.jpg",
+      "description": "In Gràcia, I asked for pa amb tomàquet at Taverna El Glop...",
+      "image_link": null,
       "decision": null
     }
   ]
 }
 ```
 
-`layout` is `single` for one entry or `pair` for two. `source` is `initial` for the first six choices and `adaptive` afterward. Every entry has an ID, name, category, description, HTTP(S) image link, and nullable recorded `decision`, so a partial-page reload restores what the user already chose.
+`layout` is `single` for one entry or `pair` for two. `source` is `initial` for the first six choices and `adaptive` afterward. Every entry has an ID, name, category, journal description, nullable HTTP(S) image link, and nullable recorded `decision`, so a partial-page reload restores what the user already chose. Current authoritative entries have `image_link: null`; private Cala metadata is not exposed.
 
-### Record a response
+### Replace page feedback atomically
 
 ```http
-PUT /api/v1/itineraries/{itinerary_id}/preference-items/{item_id}/response
+PUT /api/v1/itineraries/{itinerary_id}/preference-pages/{page_id}/feedback
 Content-Type: application/json
 ```
 
 ```json
-{ "decision": "like" }
-```
-
-`decision` is exactly `like` or `dislike`. The item must belong to the itinerary. The operation is an upsert: sending the same value is idempotent, and sending the other value changes the response while learning remains open.
-
-```json
 {
-  "itinerary_id": "52cf6f93-9fbc-4f97-a815-74b8fedcb8b1",
-  "item_id": "0664f4fd-a1bf-4d06-8629-f93062d900a1",
-  "decision": "like",
-  "recorded_at": "2026-08-29T12:02:00Z"
+  "decisions": {
+    "0664f4fd-a1bf-4d06-8629-f93062d900a1": "like",
+    "fe11b9d1-f562-41d2-92f9-d1c005b98877": null
+  }
 }
 ```
+
+Each supplied decision is `like`, `dislike`, or `null`; omitted and null items are neutral. The page must belong to the itinerary and every supplied item must belong to the page. In one transaction the API locks the collecting session/page, upserts explicit responses, deletes responses changed to neutral, rebuilds the bandit state from all durable responses, and commits the page. Equivalent replay is idempotent. The response is the updated page shape shown above.
 
 ### Complete learning and start generation
 
@@ -148,7 +144,7 @@ Content-Type: application/json
 POST /api/v1/itineraries/{itinerary_id}/preference-learning/complete
 ```
 
-Completion is allowed at any time while the learning session is collecting, including when some or every issued entry is unanswered and when no adaptive page exists. Recorded `like` responses are passed as selected activities, recorded `dislike` responses as rejected activities, and unanswered entries are neutral and omitted from both snapshots. The API calls the algorithm's update hook with those recorded snapshots, atomically closes learning, transitions the itinerary to `queued`, creates one version-4 orchestration run, and then best-effort notifies Redis. Replays return the same resource and do not create a second run; after completion, responses and page issuance remain closed.
+Completion is allowed at any time while the learning session is collecting, including when some or every issued entry is unanswered and when no adaptive page exists. Under the same learning-session lock used by feedback, the API reloads final responses, rebuilds/finalizes state, atomically closes learning, transitions the itinerary to `queued`, and creates one version-4 orchestration run. It then best-effort notifies Redis. Replays return the same resource and do not create a second run; after completion, feedback and page issuance remain closed.
 
 The `202` body matches itinerary creation: `id`, `status: "pending"`, and `status_url`. It includes `Retry-After` for worker polling. The worker receives original city/tags plus the full selected/rejected activity snapshots. Only after this endpoint should the frontend poll for generated output.
 

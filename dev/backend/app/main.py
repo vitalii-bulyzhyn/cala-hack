@@ -6,7 +6,6 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.api.itinerary_schemas import ErrorDetail, ErrorResponse
 from app.api.router import api_router
@@ -45,7 +44,6 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        resolved_settings.media_storage_path.mkdir(parents=True, exist_ok=True)
         yield
         if generation_queue is None:
             await resolved_queue.close()  # type: ignore[attr-defined]
@@ -65,12 +63,6 @@ def create_app(
     application.state.database = resolved_database
     application.state.generation_queue = resolved_queue
     application.state.preference_learning_algorithm = resolved_preference_algorithm
-    application.mount(
-        resolved_settings.media_url_path,
-        StaticFiles(directory=resolved_settings.media_storage_path, check_dir=False),
-        name="generated-media",
-    )
-
     application.add_middleware(
         CORSMiddleware,
         allow_origins=resolved_settings.cors_origins,

@@ -11,6 +11,7 @@ from app.domain.itineraries import (
     clean_city,
     clean_tags,
 )
+from app.domain.preferences import SUPPORTED_JOURNAL_CITIES
 
 
 class ItineraryCreateRequest(BaseModel):
@@ -22,7 +23,12 @@ class ItineraryCreateRequest(BaseModel):
     @field_validator("city")
     @classmethod
     def validate_city(cls, value: str) -> str:
-        return clean_city(value)
+        city = clean_city(value)
+        supported = {candidate.casefold(): candidate for candidate in SUPPORTED_JOURNAL_CITIES}
+        canonical = supported.get(city.casefold())
+        if canonical is None:
+            raise ValueError("city must be Barcelona, Toulouse, or Valencia")
+        return canonical
 
     @field_validator("tags")
     @classmethod

@@ -1,6 +1,6 @@
 # Domain model
 
-Status: Revisions `20260829_0001` through `20260829_0004`, preference learning, the public projection, provider lifecycle, checkpoints, and local media ownership are **Current**.
+Status: Revisions `20260829_0001` through `20260829_0006`, preference learning, the public projection, provider lifecycle, checkpoints, and local media ownership are **Current**.
 
 ## Ownership
 
@@ -25,7 +25,7 @@ One durable city/tag resource that learns preferences before generation.
 
 ### PreferenceLearningSession
 
-One itinerary-owned session with `collecting|completed` status, algorithm version, completion timestamp, and audit timestamps. Creation inserts it with the itinerary. Existing pre-revision-0004 resources are backfilled as `completed` with `legacy-preference-bypass`.
+One itinerary-owned session with `collecting|completed` status, algorithm version, nullable JSONB algorithm state, completion timestamp, and audit timestamps. Creation inserts it with the itinerary. Existing pre-revision-0004 resources are backfilled as `completed` with `legacy-preference-bypass`. Missing state means untouched priors; non-null state must validate as schema version 1 with positive alpha/beta values for exactly the four categories.
 
 ### PreferencePage and PreferenceItem
 
@@ -35,11 +35,11 @@ An ordered page belongs to the itinerary session and records:
 - `single|pair` layout and `initial|adaptive` source;
 - exactly one or two ordered items at the application layer.
 
-Every item stores an immutable UUID, itinerary/page association, position, name, category, description, and HTTP(S) `image_link`. The initial algorithm result must be exactly three pair pages, six items total.
+Every item stores an immutable UUID, itinerary/page association, position, name, city-journal category, journal prose, optional HTTP(S) `image_link`, and nullable private Cala entity ID/type. The current authoritative entries intentionally omit media rather than use unrelated replacement images. The initial algorithm result must be exactly three pair pages, six items total.
 
 ### PreferenceResponse
 
-One unique response per `(itinerary_id,item_id)` with `like|dislike` decision and timestamps. Composite foreign keys prevent cross-itinerary responses. The API upserts a response while the session is collecting; completion makes all preference state immutable.
+One unique response per `(itinerary_id,item_id)` with `like|dislike` decision and timestamps. Composite foreign keys prevent cross-itinerary responses. The API atomically replaces the supplied state of a whole owned page while the session is collecting; null deletes a response. The transaction rebuilds durable bandit state from all responses. Completion makes all preference state immutable.
 
 ### Stop
 
@@ -131,11 +131,13 @@ There is no public partial state.
 ## Date and plan invariants
 
 - City is NFKC-normalized, whitespace-collapsed, contains a letter, contains no control character, and is at most 160 characters.
+- New itineraries currently accept only canonical Barcelona, Toulouse, or Valencia city input because those are the only authoritative journal inventories.
 - Tags is required as an array, may be empty, has at most 20 entries, and each entry follows the same text rules with a 50-character limit.
 - Tags are case-insensitively deduplicated for storage, while idempotency additionally treats tag order as irrelevant.
 - Creation commits the itinerary and learning session atomically, with no generation run.
 - Initial suggestions are exactly three pairs; later suggestions contain one item or one pair.
 - Completion may close a collecting session with zero, partial, or complete responses and without an adaptive page; unanswered items are neutral and omitted from selected/rejected snapshots.
+- Page feedback, state reconstruction, and completion serialize on the learning-session lock. Completion finalizes state and creates its run in that same transaction.
 - Completion atomically closes learning, changes `learning_preferences -> queued`, and creates exactly one version-4 run.
 - Planned date is the immutable UTC reference date plus seven days.
 - Destination timezone is a valid IANA name.

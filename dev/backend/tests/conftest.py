@@ -20,7 +20,7 @@ def settings(tmp_path: Path) -> Settings:
         openai_api_key=None,
         cala_api_key=None,
         fal_key=None,
-        media_storage_path=tmp_path / "generated-media",
+        image_public_path=tmp_path / "frontend-public",
     )
 
 

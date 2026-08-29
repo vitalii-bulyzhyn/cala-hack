@@ -23,14 +23,14 @@ make smoke
 - Real itinerary creation and persistence. The legacy terminal-generation smoke is replaced by preference lifecycle coverage because creation no longer starts a run.
 - A done result's app-owned media URL, place count, and place links.
 
-Composed smoke creates an itinerary, answers the three initial catalog pairs, completes learning, and polls the worker. With empty generation keys it reaches the safe provider-configuration failure without a provider call; configured keys can consume quota/money.
+Composed smoke creates an itinerary, answers the three initial city-journal pairs, completes learning, and polls the worker. With empty generation keys and offline demo mode enabled it reaches a complete, non-billable result; configured keys can consume quota/money.
 
 ## Current backend coverage
 
 - City/tag NFKC/whitespace cleaning, length/control/letter constraints, tag deduplication, and extra-field rejection.
 - Optional idempotency hashing, semantic city/tag fingerprint, replay current status/header, conflict, and no duplicate learning session.
-- Three initial pairs/six activity contracts, four-category catalog coverage, deterministic ranking, optional OpenAI rerank/fallback, single/pair adaptive layouts, activity validation, and unanswered-page replay.
-- Itinerary/item-scoped like/dislike upserts, zero/partial/full-response completion, neutral unanswered items, algorithm update hook, single version-4 run creation, and worker notification.
+- Exact supported-city inventory loading with no generic fallback, three initial pairs/six entry contracts, four-category coverage, deterministic ranking, optional OpenAI rerank/fallback, persisted Thompson selection, single/pair adaptive layouts, single adaptive-page enforcement, entry validation, and unanswered-page replay.
+- Itinerary/page/item ownership, atomic full-page feedback, idempotent replay, neutral removal, response-edit state reconstruction, zero/partial/full-response completion, single version-4 run creation, and worker notification.
 - Worker preference snapshots partition selected/rejected activities in stable page/item order.
 - Public projection matrix for all internal statuses, including nullable stage/result/error invariants and incomplete-ready fallback.
 - Fixed creation-date-plus-seven-days behavior across retries and valid IANA timezone resolution.
@@ -42,14 +42,14 @@ Composed smoke creates an itinerary, answers the three initial catalog pairs, co
 - Completion invariant: three to five places, links/map requirement, exactly one ready hero, and atomic fenced persistence.
 - Missing-provider configuration path and no provider calls.
 - Redis operation bounds, persist-before-notify, outage/reconciliation, attempt backoff/exhaustion, and worker health.
-- All Alembic upgrade paths, schema/model alignment, and revision-0001-through-0004 migration behavior.
+- All Alembic upgrade paths, schema/model alignment, and revision-0001-through-0006 migration behavior.
 
 The backend suite uses provider/repository/media/algorithm fakes by default. Add targeted multi-worker Postgres integration coverage for learning-page concurrency, row locking, stale-fence races, and migration constraints as risk grows.
 
 ## Remaining automated frontend coverage
 
 - City/tag field validation and input preservation.
-- Single/pair preference page rendering, item-ID response writes, reload replay, and six-answer completion.
+- Single/pair preference page rendering, atomic page-state writes, reload restoration, optional refinement, and completion at any response count.
 - Polling that honors `Retry-After`, does not resubmit after GET interruption, and stops on terminal status.
 - `learning_preferences`, `queued`, `researching`, `planning`, and `illustrating` announcements.
 - Complete `done` rendering from result schema and app media URL.

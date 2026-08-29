@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -15,7 +14,7 @@ class PreferenceEntryResponse(BaseModel):
     name: str
     category: str
     description: str
-    image_link: str
+    image_link: str | None
     decision: PreferenceDecision | None
 
 
@@ -27,14 +26,7 @@ class PreferencePageResponse(BaseModel):
     entries: list[PreferenceEntryResponse]
 
 
-class PreferenceDecisionRequest(BaseModel):
+class PreferencePageFeedbackRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    decision: PreferenceDecision
-
-
-class PreferenceDecisionResponse(BaseModel):
-    itinerary_id: UUID
-    item_id: UUID
-    decision: PreferenceDecision
-    recorded_at: datetime
+    decisions: dict[UUID, PreferenceDecision | None]

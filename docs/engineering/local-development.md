@@ -1,6 +1,6 @@
 # Local development
 
-Status: Commands, four migrations, catalog-backed preference endpoints, worker pipeline, checkpoints, and shared local media are **Current**.
+Status: Commands, six migrations, city-journal preference endpoints, worker pipeline, checkpoints, and shared local media are **Current**.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ make dev
 
 This creates `.env` when missing, builds images, runs the one-shot `migrate` and local media-permission initialization, and starts frontend, backend, worker, Postgres, Redis, and pgAdmin. API and worker share the `generated_media` volume.
 
-The stack starts with a bundled activity catalog, paper journal asset, and optional empty provider keys. Initial/adaptive preference pages and a complete labeled demo journal work deterministically without keys or external calls. OpenAI may rerank adaptive choices when configured; the real Cala/OpenAI/fal generation path is selected only when all three keys exist.
+The stack starts with authoritative Barcelona, Toulouse, and Valencia journal-entry inventories, a paper journal asset, and optional empty provider keys. Initial/adaptive preference pages and a complete labeled demo journal work deterministically without keys or external calls. OpenAI may rerank adaptive choices when configured; the real Cala/OpenAI/fal generation path is selected only when all three keys exist.
 
 Use `make setup` only for host-local application processes.
 
@@ -106,7 +106,7 @@ curl --fail http://localhost:8000/api/v1/itineraries/RESOURCE_UUID
 curl http://localhost:8000/api/v1/itineraries/RESOURCE_UUID/preference-pages/next
 ```
 
-The second call returns the first pair. Record every entry with `PUT .../preference-items/{item_id}/response`, repeat for three initial pages, request and answer the adaptive page, then complete with `POST .../preference-learning/complete`. Poll its `status_url` and honor `Retry-After`.
+The second call returns the first pair. Submit each pair's complete decision map with `PUT .../preference-pages/{page_id}/feedback`, repeat for the three initial pages, optionally request/answer the adaptive page, then complete with `POST .../preference-learning/complete`. Poll its `status_url` and honor `Retry-After`.
 
 ## Dependency and storage behavior
 

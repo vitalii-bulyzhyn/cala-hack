@@ -98,10 +98,10 @@ class Settings(BaseSettings):
     fal_start_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     fal_result_timeout_seconds: float = Field(default=180.0, gt=0, le=1800)
 
-    media_storage_path: Path = MONOREPO_ROOT / ".data" / "generated-media"
-    media_url_path: str = "/media"
+    image_public_path: Path = MONOREPO_ROOT / "dev" / "frontend" / "public"
     media_download_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     media_max_bytes: int = Field(default=15_000_000, ge=1_000_000, le=100_000_000)
+    media_max_pixels: int = Field(default=20_000_000, ge=1_000_000, le=100_000_000)
 
     @field_validator("log_level")
     @classmethod
@@ -125,14 +125,6 @@ class Settings(BaseSettings):
         normalized = value.strip()
         if not normalized:
             raise ValueError("provider model IDs cannot be blank")
-        return normalized
-
-    @field_validator("media_url_path")
-    @classmethod
-    def normalize_media_url_path(cls, value: str) -> str:
-        normalized = "/" + value.strip().strip("/")
-        if normalized == "/":
-            raise ValueError("MEDIA_URL_PATH cannot be the application root")
         return normalized
 
     @field_validator("generation_queue_key", "worker_name", "worker_heartbeat_key")

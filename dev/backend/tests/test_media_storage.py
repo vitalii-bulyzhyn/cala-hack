@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,7 +7,9 @@ import pytest
 
 from app.integrations.media_storage import LocalMediaStore, MediaStorageError
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\ntravel-journal-test-image"
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 class ChunkedStream(httpx.AsyncByteStream):
@@ -28,9 +31,9 @@ def _store(
     return (
         LocalMediaStore(
             root=tmp_path,
-            public_url_path="/media/",
             timeout_seconds=1,
             max_bytes=max_bytes,
+            max_pixels=1_000_000,
             http_client=client,
         ),
         client,
@@ -54,22 +57,23 @@ async def test_copies_https_provider_image_to_confined_owned_path(tmp_path: Path
         )
 
     store, client = _store(tmp_path, httpx.MockTransport(handler))
-    itinerary_id = uuid4()
+    image_id = uuid4()
 
     stored = await store.copy_from_provider(
         source_url="https://fal.example/generated/image",
-        itinerary_id=itinerary_id,
+        image_id=image_id,
         expected_content_type="image/jpeg",
     )
 
     assert len(requests) == 1
     assert requests[0].method == "GET"
-    assert stored.storage_key == f"{itinerary_id}/journal.png"
-    assert stored.public_url == f"/media/{itinerary_id}/journal.png"
+    assert stored.storage_key == f"{image_id}.png"
+    assert stored.public_url == f"/{image_id}.png"
     assert stored.content_type == "image/png"
-    assert stored.byte_count == len(PNG_BYTES)
-    assert (tmp_path / stored.storage_key).read_bytes() == PNG_BYTES
-    assert not list((tmp_path / str(itinerary_id)).glob("*.tmp"))
+    assert stored.byte_count > 8
+    assert stored.width == stored.height == 1
+    assert (tmp_path / stored.storage_key).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert not list(tmp_path.glob("*.tmp"))
 
     await store.aclose()
     assert client.is_closed is False
@@ -99,7 +103,7 @@ async def test_rejects_unsafe_source_url_before_network_access(
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url=source_url,
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type="image/png",
         )
 
@@ -124,7 +128,7 @@ async def test_rejects_declared_content_length_over_limit(tmp_path: Path) -> Non
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url="https://fal.example/oversized.png",
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type="image/png",
         )
 
@@ -149,7 +153,7 @@ async def test_rejects_chunked_body_when_stream_crosses_limit(tmp_path: Path) ->
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url="https://fal.example/chunked.png",
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type="image/png",
         )
 
@@ -185,7 +189,7 @@ async def test_rejects_empty_or_unsupported_image_content(
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url="https://fal.example/invalid",
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type=expected_content_type,
         )
 
@@ -201,16 +205,16 @@ async def test_uses_expected_supported_type_when_response_omits_type(tmp_path: P
         return httpx.Response(200, request=request, content=PNG_BYTES)
 
     store, client = _store(tmp_path, httpx.MockTransport(handler))
-    itinerary_id = uuid4()
+    image_id = uuid4()
 
     stored = await store.copy_from_provider(
         source_url="https://fal.example/untyped",
-        itinerary_id=itinerary_id,
+        image_id=image_id,
         expected_content_type="image/png",
     )
 
     assert stored.content_type == "image/png"
-    assert stored.storage_key.endswith("/journal.png")
+    assert stored.storage_key == f"{image_id}.png"
     assert (tmp_path / stored.storage_key).read_bytes() == PNG_BYTES
     await client.aclose()
 
@@ -233,7 +237,7 @@ async def test_maps_http_download_failures(
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url="https://fal.example/unavailable.png",
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type="image/png",
         )
 
@@ -253,7 +257,7 @@ async def test_maps_network_timeout_as_retryable(tmp_path: Path) -> None:
     with pytest.raises(MediaStorageError) as raised:
         await store.copy_from_provider(
             source_url="https://fal.example/slow.png",
-            itinerary_id=uuid4(),
+            image_id=uuid4(),
             expected_content_type="image/png",
         )
 
@@ -279,7 +283,7 @@ async def test_rejects_loopback_provider_target(tmp_path: Path) -> None:
         with pytest.raises(MediaStorageError) as raised:
             await store.copy_from_provider(
                 source_url="https://127.0.0.1/private.png",
-                itinerary_id=uuid4(),
+                image_id=uuid4(),
                 expected_content_type="image/png",
             )
 
@@ -308,7 +312,7 @@ async def test_rejects_private_target_on_redirect_before_following_it(tmp_path: 
         with pytest.raises(MediaStorageError) as raised:
             await store.copy_from_provider(
                 source_url="https://fal.example/redirect.png",
-                itinerary_id=uuid4(),
+                image_id=uuid4(),
                 expected_content_type="image/png",
             )
 
@@ -331,7 +335,7 @@ async def test_malformed_url_is_mapped_to_safe_storage_error(tmp_path: Path) -> 
         with pytest.raises(MediaStorageError) as raised:
             await store.copy_from_provider(
                 source_url="https://[not-a-valid-ipv6/image.png",
-                itinerary_id=uuid4(),
+                image_id=uuid4(),
                 expected_content_type="image/png",
             )
 
@@ -372,7 +376,7 @@ async def test_rejects_mime_and_byte_signature_mismatch(
         with pytest.raises(MediaStorageError) as raised:
             await store.copy_from_provider(
                 source_url="https://fal.example/mismatched-image",
-                itinerary_id=uuid4(),
+                image_id=uuid4(),
                 expected_content_type=expected_type,
             )
 
@@ -407,7 +411,7 @@ async def test_maps_filesystem_oserror_to_retryable_storage_error(
         with pytest.raises(MediaStorageError) as raised:
             await store.copy_from_provider(
                 source_url="https://fal.example/generated.png",
-                itinerary_id=uuid4(),
+                image_id=uuid4(),
                 expected_content_type="image/png",
             )
 

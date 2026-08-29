@@ -3,6 +3,7 @@ import type {
   ItineraryAccepted,
   ItineraryResource,
   PreferencePage,
+  PreferenceDecision,
 } from "@/lib/api-contract";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
@@ -106,17 +107,17 @@ export function getPreferencePages(itineraryId: string) {
   );
 }
 
-export function recordPreference(
+export function submitPreferencePageFeedback(
   itineraryId: string,
-  itemId: string,
-  decision: "like" | "dislike",
+  pageId: string,
+  decisions: Record<string, PreferenceDecision>,
 ) {
-  return request<unknown>(
-    `/api/v1/itineraries/${itineraryId}/preference-items/${itemId}/response`,
+  return request<PreferencePage>(
+    `/api/v1/itineraries/${itineraryId}/preference-pages/${pageId}/feedback`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision }),
+      body: JSON.stringify({ decisions }),
     },
   );
 }

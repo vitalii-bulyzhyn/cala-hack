@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.itinerary_schemas import ErrorResponse, ItineraryAcceptedResponse
 from app.api.preference_schemas import (
-    PreferenceDecisionRequest,
-    PreferenceDecisionResponse,
     PreferenceEntryResponse,
+    PreferencePageFeedbackRequest,
     PreferencePageResponse,
 )
 from app.core.dependencies import get_preference_learning_service
@@ -81,29 +80,24 @@ async def get_next_preference_page(
 
 
 @router.put(
-    "/{itinerary_id}/preference-items/{item_id}/response",
-    response_model=PreferenceDecisionResponse,
+    "/{itinerary_id}/preference-pages/{page_id}/feedback",
+    response_model=PreferencePageResponse,
     responses={
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
         status.HTTP_409_CONFLICT: {"model": ErrorResponse},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
     },
 )
-async def record_preference_response(
+async def record_preference_page_feedback(
     itinerary_id: UUID,
-    item_id: UUID,
-    payload: PreferenceDecisionRequest,
+    page_id: UUID,
+    payload: PreferencePageFeedbackRequest,
     response: Response,
     service: Annotated[PreferenceLearningService, Depends(get_preference_learning_service)],
-) -> PreferenceDecisionResponse:
-    recorded = await service.record_response(itinerary_id, item_id, payload.decision)
+) -> PreferencePageResponse:
+    page = await service.record_page_feedback(itinerary_id, page_id, payload.decisions)
     response.headers["Cache-Control"] = "no-store"
-    return PreferenceDecisionResponse(
-        itinerary_id=itinerary_id,
-        item_id=recorded.response.item_id,
-        decision=recorded.response.decision,
-        recorded_at=recorded.response.updated_at,
-    )
+    return _page_response(page)
 
 
 @router.post(

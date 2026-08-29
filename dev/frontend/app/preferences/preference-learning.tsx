@@ -12,9 +12,13 @@ import {
   completePreferenceLearning,
   getNextPreferencePage,
   getPreferencePages,
-  recordPreference,
+  submitPreferencePageFeedback,
 } from "@/lib/api-client";
-import type { PreferenceEntry, PreferencePage } from "@/lib/api-contract";
+import type {
+  PreferenceDecision,
+  PreferenceEntry,
+  PreferencePage,
+} from "@/lib/api-contract";
 
 const LEFT_PAGE_BACKGROUND = "/journal-left-page-background.jpg";
 const RIGHT_PAGE_BACKGROUND = "/journal-page-background.jpg";
@@ -25,12 +29,13 @@ const BOOK_VERTICAL_CLEARANCE = 40;
 
 const CATEGORY_LABELS: Record<PreferenceEntry["category"], string> = {
   food: "Food",
-  drinks_party: "Drinks & nightlife",
   culture: "Culture",
-  nature: "Nature",
+  outdoors: "Outdoors",
+  neighbourhoods: "Neighbourhoods",
 };
 
 type IssuedEntry = PreferenceEntry & {
+  pageId: string;
   source: PreferencePage["source"];
 };
 
@@ -49,17 +54,22 @@ function PreferenceFace({ entry, pageNumber }: PreferenceFaceProps) {
       className={styles.preferenceJournalFace}
       style={{ backgroundImage: `url(${background})` }}
     >
-      <figure className={styles.preferencePhoto}>
-        {/* Activity image URLs are supplied by the backend catalog. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          alt={`${entry.name} travel inspiration`}
-          crossOrigin="anonymous"
-          draggable={false}
-          src={entry.image_link}
-        />
-      </figure>
-      <div className={styles.preferenceFaceCopy}>
+      {entry.image_link ? (
+        <figure className={styles.preferencePhoto}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt={`${entry.name} travel inspiration`}
+            crossOrigin="anonymous"
+            draggable={false}
+            src={entry.image_link}
+          />
+        </figure>
+      ) : null}
+      <div
+        className={`${styles.preferenceFaceCopy} ${
+          entry.image_link ? "" : styles.preferenceJournalTextFace
+        }`}
+      >
         <p className={styles.category}>
           {CATEGORY_LABELS[entry.category] ?? entry.category}
         </p>
@@ -141,6 +151,11 @@ function nextBookPage(currentPage: number, terminalPage: number) {
   return Math.min(terminalPage, currentPage + 2);
 }
 
+function bookPageForEntryIndex(entryIndex: number) {
+  if (entryIndex <= 0) return 0;
+  return Math.floor((entryIndex + 1) / 2) * 2 - 1;
+}
+
 function visibleEntryIndexes(
   currentPage: number,
   totalFaces: number,
@@ -167,7 +182,11 @@ function visiblePageLabel(currentPage: number, totalFaces: number) {
 
 function flattenEntries(pages: PreferencePage[]): IssuedEntry[] {
   return pages.flatMap((page) =>
-    page.entries.map((entry) => ({ ...entry, source: page.source })),
+    page.entries.map((entry) => ({
+      ...entry,
+      pageId: page.id,
+      source: page.source,
+    })),
   );
 }
 
@@ -177,6 +196,7 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
   const [bookPage, setBookPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submittingEntryId, setSubmittingEntryId] = useState<string | null>(null);
+  const [refining, setRefining] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const {
@@ -187,6 +207,11 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
 
   const entries = useMemo(() => flattenEntries(pages), [pages]);
   const totalFaces = entries.length;
+  const initialEntries = entries.filter((entry) => entry.source === "initial");
+  const canRefine =
+    initialEntries.length > 0 &&
+    initialEntries.every((entry) => entry.decision !== null) &&
+    !entries.some((entry) => entry.source === "adaptive");
   const lastBookPage = terminalBookPage(totalFaces);
   const visibleEntries = visibleEntryIndexes(bookPage, totalFaces);
   const measuredWidth = availableWidth || MIN_PAGE_WIDTH * 2 + BOOK_SIDE_CLEARANCE;
@@ -291,14 +316,87 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     setError(null);
 
     try {
-      await recordPreference(itineraryId, entry.id, decision);
-      await refreshIssuedPages();
+      const page = pages.find((candidate) => candidate.id === entry.pageId);
+      if (!page) throw new Error("That preference page is no longer available.");
+      const nextDecision: PreferenceDecision =
+        entry.decision === decision ? null : decision;
+      const decisions = Object.fromEntries(
+        page.entries.map((candidate) => [
+          candidate.id,
+          candidate.id === entry.id ? nextDecision : candidate.decision,
+        ]),
+      );
+      setPages((current) =>
+        current.map((candidate) =>
+          candidate.id === page.id
+            ? {
+                ...candidate,
+                entries: candidate.entries.map((candidateEntry) =>
+                  candidateEntry.id === entry.id
+                    ? { ...candidateEntry, decision: nextDecision }
+                    : candidateEntry,
+                ),
+              }
+            : candidate,
+        ),
+      );
+      const updated = await submitPreferencePageFeedback(
+        itineraryId,
+        page.id,
+        decisions,
+      );
+      setPages((current) =>
+        current.map((candidate) =>
+          candidate.id === updated.id ? updated : candidate,
+        ),
+      );
+      if (nextDecision !== null) {
+        setBookPage((currentPage) =>
+          currentPage < lastBookPage
+            ? nextBookPage(currentPage, lastBookPage)
+            : currentPage,
+        );
+      }
     } catch (caught) {
+      setPages((current) =>
+        current.map((candidate) =>
+          candidate.id === entry.pageId
+            ? pages.find((issuedPage) => issuedPage.id === entry.pageId) ?? candidate
+            : candidate,
+        ),
+      );
       setError(
         caught instanceof Error ? caught.message : "Could not save that choice.",
       );
     } finally {
       setSubmittingEntryId(null);
+    }
+  }
+
+  async function refinePreferences() {
+    if (refining || !canRefine) return;
+    setRefining(true);
+    setError(null);
+    try {
+      const adaptive = await getNextPreferencePage(itineraryId);
+      const issued = await refreshIssuedPages();
+      if (adaptive) {
+        const nextEntries = flattenEntries(issued);
+        const firstAdaptiveEntry = nextEntries.findIndex(
+          (entry) => entry.source === "adaptive",
+        );
+        if (firstAdaptiveEntry !== -1) {
+          setBookPage(bookPageForEntryIndex(firstAdaptiveEntry));
+        }
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not refine your preferences.",
+      );
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -339,7 +437,7 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
     <main className={journalStyles.demoShell}>
       <h1 className={journalStyles.visuallyHidden}>Which feels more like you?</h1>
       <section
-        aria-busy={Boolean(submittingEntryId) || finishing}
+        aria-busy={Boolean(submittingEntryId) || finishing || refining}
         aria-keyshortcuts="ArrowLeft ArrowRight"
         aria-label="Travel preference journal"
         className={journalStyles.trialPanel}
@@ -358,9 +456,19 @@ export function PreferenceLearning({ itineraryId }: { itineraryId: string }) {
             >
               Previous
             </button>
+            {bookPage === lastBookPage && canRefine ? (
+              <button
+                className={journalStyles.pageButton}
+                disabled={finishing || refining}
+                onClick={() => void refinePreferences()}
+                type="button"
+              >
+                {refining ? "Refining…" : "Refine my preferences"}
+              </button>
+            ) : null}
             <button
               className={journalStyles.pageButton}
-              disabled={finishing}
+              disabled={finishing || refining}
               onClick={showNextPages}
               type="button"
             >

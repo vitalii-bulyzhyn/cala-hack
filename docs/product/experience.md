@@ -10,7 +10,7 @@ The primary task is: choose a city and tags, react to visual activity options in
 
 ### 1. City and tags
 
-- Use a clearly labeled city field and grouped tag-selection controls with one primary action.
+- Use a clearly labeled selector for Barcelona, Toulouse, or Valencia and grouped tag-selection controls with one primary action.
 - Require the tag array in transport while allowing it to be empty; backend validation retains the 20-tag and 50-character-per-tag limits.
 - Preserve city and tags after client/API validation failure and identify the error in place.
 
@@ -18,11 +18,12 @@ The primary task is: choose a city and tags, react to visual activity options in
 
 - Use the itinerary ID to call `GET .../preference-pages/next` once to issue the three initial pairs, then `GET .../preference-pages` to load every persisted page.
 - Present the six initial activities as six faces in the same flipping journal used for the result. A returned `pair` supplies the left/right faces of one opening; a returned `single` occupies one centered face.
-- Every card/opening uses the returned image link, name, category, description, and nullable saved decision. Do not infer identity from array position; send the entry UUID with the response.
-- Record each choice with `PUT .../preference-items/{item_id}/response` and `decision: like|dislike`.
-- Keep like and dislike controls on every activity face, restore their pressed state from `decision`, and allow page turns whether or not the current face has a response. A vote affects only the exact entry UUID.
+- Every card/opening uses the returned name, category, journal prose, optional image link, and nullable saved decision. Text-only entries render as journal writing on paper; never invent replacement imagery. Do not infer identity from array position.
+- Submit the full opening with `PUT .../preference-pages/{page_id}/feedback`. Each issued item maps to `like`, `dislike`, or `null`; omitted/null items are neutral.
+- Keep like and dislike controls on every activity face, restore their pressed state from `decision`, and allow page turns whether or not the current face has a response. Repeating a selected control returns that item to neutral.
+- After a newly explicit like or dislike is saved, advance to the next journal opening when one remains. Returning a selected item to neutral stays on the current opening.
 - The integrated flow shows the three initial pairs as six faces and lets the traveler create the journal from the final face whether they answered all, some, or none. Unanswered activities are neutral.
-- A client that records all six initial responses may optionally request an adaptive single/pair page; a `204` means the algorithm has no further page. An adaptive page is not required for completion.
+- After all issued initial items have explicit decisions, the integrated UI offers “Refine my preferences” to request the optional adaptive page. A `204` means there is no further page. Refinement is never required for completion.
 - The frontend calls completion when the traveler finishes the preference book; generation begins from its `202` response using only recorded likes/dislikes.
 - Initial suggestions work without provider keys. Adaptive OpenAI reranking falls back deterministically when unavailable.
 
@@ -61,7 +62,7 @@ Retain the original city/tags and show the safe backend message. Use `retryable`
 | --- | --- |
 | Before submit | Explain the one-day promise and focus the city field. |
 | Client validation error | Identify the problem without clearing city or tags. |
-| Preference pages | Render every issued entry as a journal face, permit page turns before voting, and persist each response by item ID. |
+| Preference pages | Render every issued entry as a journal face, permit page turns before voting, and persist the full page state atomically. |
 | End of preference book | Allow completion with zero or more responses and enter generation polling. |
 | No next page (`204`) | Complete learning if the client used optional adaptive progression. |
 | `pending` | Announce the current stage and continue polling. `result` and `error` are null. |

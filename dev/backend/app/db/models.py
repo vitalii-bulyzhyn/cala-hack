@@ -152,6 +152,7 @@ class PreferenceLearningSession(TimestampMixin, Base):
         server_default=PreferenceLearningStatus.COLLECTING.value,
     )
     algorithm_version: Mapped[str | None] = mapped_column(String(80))
+    algorithm_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     itinerary: Mapped[Itinerary] = relationship(back_populates="preference_learning")
@@ -228,7 +229,9 @@ class PreferenceItem(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     category: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str] = mapped_column(String(600), nullable=False)
-    image_link: Mapped[str] = mapped_column(String(2000), nullable=False)
+    image_link: Mapped[str | None] = mapped_column(String(2000))
+    cala_entity_id: Mapped[str | None] = mapped_column(String(200))
+    cala_entity_type: Mapped[str | None] = mapped_column(String(80))
 
     page: Mapped[PreferencePage] = relationship(back_populates="entries")
     response: Mapped[PreferenceResponse | None] = relationship(

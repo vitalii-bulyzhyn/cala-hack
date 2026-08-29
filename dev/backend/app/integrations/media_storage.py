@@ -2,14 +2,16 @@ import asyncio
 import ipaddress
 import os
 import socket
+from io import BytesIO
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import ClassVar
-from urllib.parse import quote, urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit
 from uuid import UUID, uuid4
 
 import httpx
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,8 @@ class StoredMedia:
     public_url: str
     content_type: str
     byte_count: int
+    width: int
+    height: int
 
 
 @dataclass(eq=False)
@@ -30,11 +34,17 @@ class MediaStorageError(Exception):
 class LocalMediaStore:
     """Copy trusted provider images into app-owned local persistent storage."""
 
-    _EXTENSIONS: ClassVar[dict[str, str]] = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/avif": ".avif",
+    _SUPPORTED_TYPES: ClassVar[set[str]] = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/avif",
+    }
+    _PIL_CONTENT_TYPES: ClassVar[dict[str, str]] = {
+        "JPEG": "image/jpeg",
+        "PNG": "image/png",
+        "WEBP": "image/webp",
+        "AVIF": "image/avif",
     }
     _REDIRECT_STATUSES: ClassVar[set[int]] = {301, 302, 303, 307, 308}
     _MAX_REDIRECTS: ClassVar[int] = 5
@@ -43,15 +53,15 @@ class LocalMediaStore:
         self,
         *,
         root: Path,
-        public_url_path: str,
         timeout_seconds: float,
         max_bytes: int,
+        max_pixels: int,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._root = root.resolve()
-        self._public_url_path = public_url_path.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._max_bytes = max_bytes
+        self._max_pixels = max_pixels
         self._owns_http_client = http_client is None
         self._resolve_dns = http_client is None
         self._http_client = http_client or httpx.AsyncClient(
@@ -64,7 +74,7 @@ class LocalMediaStore:
         self,
         *,
         source_url: str,
-        itinerary_id: UUID,
+        image_id: UUID,
         expected_content_type: str | None,
     ) -> StoredMedia:
         try:
@@ -85,40 +95,16 @@ class LocalMediaStore:
                 retryable=retryable,
             ) from exc
 
-        detected_content_type = self._detect_content_type(data)
-        declared_content_type = (
-            response_content_type if response_content_type in self._EXTENSIONS else None
+        png_data, width, height = await asyncio.to_thread(
+            self._normalize_png,
+            bytes(data),
+            response_content_type,
+            expected_content_type,
         )
-        expected_type = expected_content_type if expected_content_type in self._EXTENSIONS else None
-        if (
-            detected_content_type is None
-            or (
-                declared_content_type is not None and declared_content_type != detected_content_type
-            )
-            or (
-                declared_content_type is None
-                and expected_type is not None
-                and expected_type != detected_content_type
-            )
-        ):
-            raise MediaStorageError(
-                code="IMAGE_DOWNLOAD_INVALID_CONTENT",
-                message="The generated journal image had an unsupported format.",
-                retryable=False,
-            )
-
-        content_type = detected_content_type
-        extension = self._EXTENSIONS[content_type]
-        storage_key = f"{itinerary_id}/journal{extension}"
-        destination = (self._root / storage_key).resolve()
-        if not destination.is_relative_to(self._root):
-            raise MediaStorageError(
-                code="IMAGE_STORAGE_INVALID_PATH",
-                message="The generated journal image could not be stored.",
-                retryable=False,
-            )
+        storage_key = f"{image_id}.png"
+        destination = self._root / storage_key
         try:
-            await asyncio.to_thread(self._write_atomically, destination, bytes(data))
+            await asyncio.to_thread(self._write_atomically, destination, png_data)
         except OSError as exc:
             raise MediaStorageError(
                 code="IMAGE_STORAGE_UNAVAILABLE",
@@ -127,9 +113,48 @@ class LocalMediaStore:
             ) from exc
         return StoredMedia(
             storage_key=storage_key,
-            public_url=f"{self._public_url_path}/{quote(storage_key, safe='/')}",
-            content_type=content_type,
-            byte_count=len(data),
+            public_url=f"/{storage_key}",
+            content_type="image/png",
+            byte_count=len(png_data),
+            width=width,
+            height=height,
+        )
+
+    async def copy_from_local(self, *, source_path: Path, image_id: UUID) -> StoredMedia:
+        try:
+            data = await asyncio.to_thread(source_path.read_bytes)
+        except OSError as exc:
+            raise MediaStorageError(
+                code="IMAGE_STORAGE_UNAVAILABLE",
+                message="The generated journal image could not be stored.",
+                retryable=True,
+            ) from exc
+        if len(data) > self._max_bytes:
+            raise MediaStorageError(
+                code="IMAGE_DOWNLOAD_TOO_LARGE",
+                message="The generated journal image was too large to store.",
+                retryable=False,
+            )
+        png_data, width, height = await asyncio.to_thread(
+            self._normalize_png, data, None, None
+        )
+        storage_key = f"{image_id}.png"
+        destination = self._root / storage_key
+        try:
+            await asyncio.to_thread(self._write_atomically, destination, png_data)
+        except OSError as exc:
+            raise MediaStorageError(
+                code="IMAGE_STORAGE_UNAVAILABLE",
+                message="The generated journal image could not be stored.",
+                retryable=True,
+            ) from exc
+        return StoredMedia(
+            storage_key=storage_key,
+            public_url=f"/{storage_key}",
+            content_type="image/png",
+            byte_count=len(png_data),
+            width=width,
+            height=height,
         )
 
     async def _download(self, source_url: str) -> tuple[bytes, str]:
@@ -237,21 +262,43 @@ class LocalMediaStore:
             retryable=False,
         )
 
-    @staticmethod
-    def _detect_content_type(data: bytes | bytearray) -> str | None:
-        if data.startswith(b"\x89PNG\r\n\x1a\n"):
-            return "image/png"
-        if data.startswith(b"\xff\xd8\xff"):
-            return "image/jpeg"
-        if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-            return "image/webp"
-        if (
-            len(data) >= 12
-            and data[4:8] == b"ftyp"
-            and (data[8:12] in {b"avif", b"avis"} or b"avif" in data[12:32])
-        ):
-            return "image/avif"
-        return None
+    def _normalize_png(
+        self,
+        data: bytes,
+        declared_content_type: str | None,
+        expected_content_type: str | None,
+    ) -> tuple[bytes, int, int]:
+        declared_type = (
+            declared_content_type if declared_content_type in self._SUPPORTED_TYPES else None
+        )
+        expected_type = (
+            expected_content_type if expected_content_type in self._SUPPORTED_TYPES else None
+        )
+        try:
+            with Image.open(BytesIO(data)) as source:
+                detected_type = self._PIL_CONTENT_TYPES.get(source.format or "")
+                if detected_type is None or getattr(source, "is_animated", False):
+                    raise ValueError("unsupported image")
+                if declared_type is not None and declared_type != detected_type:
+                    raise ValueError("declared image type does not match content")
+                if declared_type is None and expected_type is not None and expected_type != detected_type:
+                    raise ValueError("expected image type does not match content")
+                width, height = source.size
+                if width <= 0 or height <= 0 or width * height > self._max_pixels:
+                    raise ValueError("image dimensions exceed the configured limit")
+                source.load()
+                normalized = ImageOps.exif_transpose(source)
+                if normalized.mode not in {"RGB", "RGBA", "L", "LA"}:
+                    normalized = normalized.convert("RGBA")
+                output = BytesIO()
+                normalized.save(output, format="PNG", optimize=True)
+                return output.getvalue(), normalized.width, normalized.height
+        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+            raise MediaStorageError(
+                code="IMAGE_DOWNLOAD_INVALID_CONTENT",
+                message="The generated journal image had an unsupported format.",
+                retryable=False,
+            ) from exc
 
     @staticmethod
     def _write_atomically(destination: Path, data: bytes) -> None:

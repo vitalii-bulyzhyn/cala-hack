@@ -336,6 +336,25 @@
   left: 13cqw;
 }
 
+.preferenceJournalTextFace {
+  top: 14%;
+}
+
+.preferenceJournalTextFace h2 {
+  max-width: 18ch;
+  margin-bottom: 7cqw;
+  font-size: clamp(1.2rem, 8cqw, 2.35rem);
+  line-height: 1;
+}
+
+.preferenceJournalTextFace > p:last-child {
+  max-width: 34ch;
+  font-family: "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  font-size: clamp(0.68rem, 3.8cqw, 1.04rem);
+  line-height: 1.48;
+  -webkit-line-clamp: 11;
+}
+
 .preferenceFaceCopy .category {
   margin-bottom: 2.2cqw;
   font-size: clamp(0.42rem, 2.5cqw, 0.68rem);

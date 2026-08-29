@@ -4,7 +4,7 @@ Status: City/tag persistence, preference-learning persistence/APIs, provider-fre
 
 ## Confirmed scope
 
-- Input: one city, 1–160 characters, plus a required array of zero to twenty preference tags, each 1–50 characters.
+- Input: Barcelona, Toulouse, or Valencia, plus a required array of zero to twenty preference tags, each 1–50 characters.
 - Learning: three initial two-activity pages (six choices), optional later one/two-activity pages, and durable like/dislike responses.
 - Output: one future/current one-day itinerary with three to five ordered places.
 - Presentation: one landscape 4:3, hand-drawn journal image plus structured place data and links.
@@ -14,8 +14,8 @@ Status: City/tag persistence, preference-learning persistence/APIs, provider-fre
 ## Current backend behavior
 
 - `POST /api/v1/itineraries` cleans/persists `city` and `tags`, creates a collecting learning session without generation work, and returns the durable ID. Optional idempotency keys are hashed.
-- Preference APIs get-or-create the next page, upsert item responses, and complete learning. Completion creates the one generation run.
-- `catalog-bandit-v1` selects six unique initial activities across food, drinks/party, culture, and nature, then may issue one adaptive single/pair page. OpenAI reranking is optional and falls back locally.
+- Preference APIs get-or-create the next page, atomically replace page feedback, and complete learning. Completion creates the one generation run.
+- `city-journal-bandit-v1` selects six unique initial entries from the chosen city's food, culture, outdoors, and neighbourhoods inventory, then may issue one adaptive single/pair page using persisted Thompson Sampling. OpenAI reranking is optional and falls back locally; unsupported cities never receive substitute content.
 - `GET /api/v1/itineraries/{id}` exposes only `pending`, `done`, or `fail`; `stage` is non-null only while pending, `result` only when done, and `error` only when failed.
 - Without provider credentials, a labeled deterministic demo uses the stored city, selected activities, UTC, map searches, and the same seven-day date so the full product remains testable.
 - With all credentials, OpenAI resolves the canonical destination and IANA timezone. Stored tags plus selected/rejected activity snapshots guide planning; the date is seven days after immutable creation.

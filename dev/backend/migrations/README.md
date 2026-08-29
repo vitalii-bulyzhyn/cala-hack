@@ -8,6 +8,8 @@ Alembic owns the Postgres schema. Applied revisions are historical and must not 
 | `20260829_0002_natural_request_and_place_links.py` | Renames the request field for 1,000-character natural language, replaces normalized city with resolved destination, adds planned date/timezone, typed place links, generation checkpoint JSON, and a unique itinerary-level hero index. |
 | `20260829_0003_city_and_tags_input.py` | Replaces the natural request field with required, separately stored city text and a JSONB preference-tag array. |
 | `20260829_0004_preference_learning.py` | Adds the pre-generation learning stage plus sessions, single/pair pages, immutable issued items, and like/dislike responses. |
+| `20260829_0005_durable_bandit_state.py` | Adds nullable, versioned JSONB algorithm state to preference-learning sessions. |
+| `20260829_0006_city_journal_inventories.py` | Makes preference media optional, persists private Cala entity metadata, and resets bandit state for the authoritative city-category arms. |
 
 The current table responsibilities are:
 

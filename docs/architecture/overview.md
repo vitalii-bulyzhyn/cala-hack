@@ -6,11 +6,11 @@ Status: The monorepo, integrated Next.js flow, catalog-backed preference learnin
 
 - `dev/frontend` creates itineraries, renders pair/single preference pages, records decisions, completes learning, polls generation, and renders terminal results/errors; it also serves the same-origin backend-health proxy.
 - `dev/backend` exposes health, provider status, city/tag create/read, read-only issued-page listing, preference next-page/response/completion endpoints, OpenAPI, and generated files below `/media`.
-- Revisions `20260829_0001` through `20260829_0004` own the Postgres schema.
+- Revisions `20260829_0001` through `20260829_0006` own the Postgres schema.
 - Compose runs frontend, backend, worker, Postgres, Redis, and pgAdmin after the one-shot migration. API and worker share a generated-media volume.
 - Postgres owns resources, lifecycle, retries, leases/fencing, plan checkpoints, fal request checkpoints, and results. Redis carries only reconstructible run-ID wake-ups and worker health.
 - The sequential worker performs real provider generation only after preference completion. The default preference algorithm uses deterministic catalog ranking and optional OpenAI adaptive reranking.
-- New preference inventory is added in `dev/backend/app/data/activities.json`; its adjacent README documents the data-only contract.
+- Authoritative preference inventory lives in `dev/backend/app/data/journal_entries/{barcelona,toulouse,valencia}.json`; unsupported cities never fall back to generic data.
 
 ## Component map
 
@@ -53,8 +53,8 @@ These boundaries are recorded in [ADR 0002](decisions/0002-backend-owned-provide
 
 1. `POST /api/v1/itineraries` cleans city/tags, fingerprints them, and commits an itinerary plus collecting preference session in `learning_preferences`; it creates no run.
 2. The next-page API asks the injected algorithm for three initial pairs and persists all six immutable entries. A separate read-only API lists all issued pages so the UI can flip through them without advancing the algorithm; after the initial responses, next-page may persist one category-learned adaptive page with one or two entries.
-3. Like/dislike upserts remain tied to the itinerary and exact issued item.
-4. Preference completion may occur with zero, partial, or complete responses and without an adaptive page. It passes only recorded likes/dislikes to the algorithm update hook, atomically transitions to `queued`, creates one orchestration run, and best-effort appends its UUID to Redis.
+3. One atomic page-feedback write validates page/item ownership, applies likes/dislikes/nulls, and reconstructs the versioned Thompson-sampling state from durable responses.
+4. Preference completion may occur with zero, partial, or complete responses and without an adaptive page. Under the learning lock it finalizes state, atomically transitions to `queued`, creates one orchestration run, and best-effort appends its UUID to Redis after commit.
 5. The worker claims the run under a Postgres lease/fence and receives city, tags, and selected/rejected activity snapshots.
 6. OpenAI resolves canonical destination/timezone; planned date is the immutable UTC creation date plus seven days.
 7. Cala knowledge query and search use tags plus learned choices for grounded candidates/context.

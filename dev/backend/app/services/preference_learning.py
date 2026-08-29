@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
@@ -13,10 +12,13 @@ from app.core.errors import (
     PreferenceItemNotFoundError,
     PreferenceLearningClosedError,
     PreferencePageIncompleteError,
+    PreferencePageNotFoundError,
+    UnsupportedJournalCityError,
 )
-from app.db.models import PreferenceItem, PreferencePage, PreferenceResponse
+from app.db.models import PreferenceItem, PreferencePage
 from app.domain.preferences import (
     Activity,
+    PreferenceAlgorithmState,
     PreferenceDecision,
     PreferenceLearningStatus,
     PreferencePageSuggestion,
@@ -28,6 +30,10 @@ from app.repositories.preference_learning import (
     PreferenceLearningRepository,
     PreferenceLearningSnapshot,
     PreferencePageIncompleteRepositoryError,
+    PreferencePageMissingError,
+)
+from app.services.activity_recommendations import (
+    UnsupportedJournalCityError as UnsupportedJournalCityAlgorithmError,
 )
 from app.worker.queue import GenerationQueue
 
@@ -53,13 +59,8 @@ class PreferenceLearningAlgorithm(Protocol):
         tags: tuple[str, ...],
         selected_activities: tuple[Activity, ...],
         rejected_activities: tuple[Activity, ...],
+        algorithm_state: PreferenceAlgorithmState,
     ) -> PreferencePageSuggestion | None: ...
-
-    async def update_learning_algorithm(
-        self,
-        selected_activities: tuple[Activity, ...],
-        rejected_activities: tuple[Activity, ...],
-    ) -> None: ...
 
 
 class UnconfiguredPreferenceLearningAlgorithm:
@@ -81,22 +82,10 @@ class UnconfiguredPreferenceLearningAlgorithm:
         tags: tuple[str, ...],
         selected_activities: tuple[Activity, ...],
         rejected_activities: tuple[Activity, ...],
+        algorithm_state: PreferenceAlgorithmState,
     ) -> PreferencePageSuggestion | None:
-        del city, tags, selected_activities, rejected_activities
+        del city, tags, selected_activities, rejected_activities, algorithm_state
         raise PreferenceAlgorithmNotConfiguredError
-
-    async def update_learning_algorithm(
-        self,
-        selected_activities: tuple[Activity, ...],
-        rejected_activities: tuple[Activity, ...],
-    ) -> None:
-        del selected_activities, rejected_activities
-        raise PreferenceAlgorithmNotConfiguredError
-
-
-@dataclass(frozen=True)
-class RecordedPreference:
-    response: PreferenceResponse
 
 
 class PreferenceLearningService:
@@ -121,6 +110,8 @@ class PreferenceLearningService:
         snapshot = await self._snapshot(itinerary_id)
         self._ensure_collecting(snapshot)
 
+        if any(page.source.value == "adaptive" for page in snapshot.pages):
+            return None
         unanswered = _first_unanswered_page(snapshot)
         if unanswered is not None:
             return unanswered
@@ -144,9 +135,12 @@ class PreferenceLearningService:
                 snapshot.tags,
                 selected,
                 rejected,
+                snapshot.algorithm_state,
             )
         except PreferenceAlgorithmNotConfiguredError as exc:
             raise PreferenceEngineUnavailableError from exc
+        except UnsupportedJournalCityAlgorithmError as exc:
+            raise UnsupportedJournalCityError from exc
         except ValueError as exc:
             raise PreferenceEngineInvalidOutputError from exc
 
@@ -166,20 +160,20 @@ class PreferenceLearningService:
             logger.exception("Could not append a preference page for itinerary %s", itinerary_id)
             raise PersistenceUnavailableError from exc
 
-    async def record_response(
+    async def record_page_feedback(
         self,
         itinerary_id: UUID,
-        item_id: UUID,
-        decision: PreferenceDecision,
-    ) -> RecordedPreference:
-        snapshot = await self._snapshot(itinerary_id)
-        self._ensure_collecting(snapshot)
+        page_id: UUID,
+        decisions: dict[UUID, PreferenceDecision | None],
+    ) -> PreferencePage:
         try:
-            response = await self._repository.record_response(
+            return await self._repository.record_page_feedback(
                 itinerary_id,
-                item_id,
-                decision,
+                page_id,
+                decisions,
             )
+        except PreferencePageMissingError as exc:
+            raise PreferencePageNotFoundError from exc
         except PreferenceItemMissingError as exc:
             raise PreferenceItemNotFoundError from exc
         except PreferencePageIncompleteRepositoryError as exc:
@@ -189,22 +183,17 @@ class PreferenceLearningService:
         except SQLAlchemyError as exc:
             logger.exception("Could not record preference response for itinerary %s", itinerary_id)
             raise PersistenceUnavailableError from exc
-        return RecordedPreference(response=response)
 
     async def complete(self, itinerary_id: UUID) -> CompletedPreferenceLearning:
         snapshot = await self._snapshot(itinerary_id)
         if snapshot.status == PreferenceLearningStatus.COMPLETED:
             return await self._repository.completed_result(itinerary_id)
-        selected, rejected = _partition_activities(snapshot)
         try:
-            await self._algorithm.update_learning_algorithm(selected, rejected)
             completed = await self._repository.complete(
                 itinerary_id,
                 algorithm_version=self._algorithm.version,
                 max_attempts=self._generation_max_attempts,
             )
-        except PreferenceAlgorithmNotConfiguredError as exc:
-            raise PreferenceEngineUnavailableError from exc
         except PreferenceLearningClosedRepositoryError as exc:
             raise PreferenceLearningClosedError from exc
         except SQLAlchemyError as exc:
@@ -271,4 +260,6 @@ def _activity(entry: PreferenceItem) -> Activity:
         category=entry.category,
         description=entry.description,
         image_link=entry.image_link,
+        cala_entity_id=entry.cala_entity_id,
+        cala_entity_type=entry.cala_entity_type,
     )

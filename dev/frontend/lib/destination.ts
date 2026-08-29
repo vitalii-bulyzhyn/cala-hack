@@ -1,4 +1,5 @@
 export const MAX_DESTINATION_LENGTH = 80;
+export const SUPPORTED_DESTINATIONS = ["Barcelona", "Toulouse", "Valencia"] as const;
 
 export function parseDestination(value: unknown) {
   if (typeof value !== "string") {
@@ -14,5 +15,9 @@ export function parseDestination(value: unknown) {
     return null;
   }
 
-  return destination;
+  return (
+    SUPPORTED_DESTINATIONS.find(
+      (candidate) => candidate.toLocaleLowerCase() === destination.toLocaleLowerCase(),
+    ) ?? null
+  );
 }
